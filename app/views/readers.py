@@ -128,7 +128,7 @@ def delete_reader(reader_id: int):
 def import_readers():
     _, load_workbook_fn, has_openpyxl = _ensure_openpyxl()
     if not has_openpyxl or load_workbook_fn is None:
-        flash("当前环境缺少 openpyxl 依赖，无法导入读者数据。", "danger")
+        flash("当前环境缺少 openpyxl 依赖，无法导入读者数据。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("readers.list_readers"))
 
     if request.form.get("template_confirmed") != "1":
@@ -173,7 +173,7 @@ def import_readers():
 def download_reader_template():
     workbook_cls, _, has_openpyxl = _ensure_openpyxl()
     if not has_openpyxl or workbook_cls is None:
-        flash("当前环境缺少 openpyxl 依赖，无法生成模板。", "danger")
+        flash("当前环境缺少 openpyxl 依赖，无法生成模板。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("readers.list_readers"))
 
     wb = workbook_cls()
@@ -195,7 +195,7 @@ def download_reader_template():
 def export_readers():
     workbook_cls, _, has_openpyxl = _ensure_openpyxl()
     if not has_openpyxl or workbook_cls is None:
-        flash("当前环境缺少 openpyxl 依赖，无法导出读者数据。", "danger")
+        flash("当前环境缺少 openpyxl 依赖，无法导出读者数据。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("readers.list_readers"))
 
     wb = workbook_cls()
