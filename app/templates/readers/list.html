@@ -38,6 +38,13 @@
           {% endfor %}
         </select>
       </div>
+      {% if current_user.level == 'admin' %}
+      <div class="checkbox">
+        <label>
+          <input type="checkbox" name="show_deleted" value="1" {% if filters.show_deleted %}checked{% endif %}> 显示已删除数据
+        </label>
+      </div>
+      {% endif %}
       <button class="btn btn-sm btn-primary" type="submit">搜索</button>
       <a class="btn btn-sm btn-default" href="{{ url_for('readers.list_readers') }}">重置</a>
     </form>
@@ -69,7 +76,13 @@
           <td>{{ reader.sex }}</td>
           <td>{{ reader.reader_class.grade.name if reader.reader_class and reader.reader_class.grade else '' }}</td>
           <td>{{ reader.reader_class.name if reader.reader_class else '' }}</td>
-          <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
+          <td>
+            {% if reader.is_deleted %}
+            <span class="text-danger">已删除</span>
+            {% else %}
+            {{ '正常' if reader.status == 'active' else reader.status }}
+            {% endif %}
+          </td>
           <td>
             <button type="button" class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
             {% if current_user.level == 'admin' %}
