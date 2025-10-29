@@ -38,6 +38,28 @@
   .filter-row {
     margin-bottom: 10px;
   }
+
+  .popular-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .popular-pager {
+    display: flex;
+    align-items: center;
+  }
+
+  .pager-icon {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .pager-icon.disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
 </style>
 <div class="row">
   <div class="col-md-6">
@@ -60,8 +82,18 @@
 <div class="row">
   <div class="col-md-6">
     <div class="panel panel-default">
-      <div class="panel-heading">最受欢迎TOP50</div>
-      <table class="table table-condensed table-hover">
+      <div class="panel-heading popular-header">
+        <span>最受欢迎TOP50</span>
+        <div class="popular-pager">
+          <span class="pager-icon" id="popularPrev" title="前一页">
+            <span class="glyphicon glyphicon-chevron-left"></span>
+          </span>
+          <span class="pager-icon" id="popularNext" title="后一页" style="margin-left: 6px;">
+            <span class="glyphicon glyphicon-chevron-right"></span>
+          </span>
+        </div>
+      </div>
+      <table class="table table-condensed table-hover" id="popularBooksTable">
         <thead>
           <tr>
             <th>排名</th>
@@ -69,15 +101,7 @@
             <th>借阅总数</th>
           </tr>
         </thead>
-        <tbody>
-          {% for book in popular_books %}
-          <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ book[0] }}</td>
-            <td>{{ book[1] or 0 }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
+        <tbody id="popularBooksBody"></tbody>
       </table>
     </div>
   </div>
@@ -133,6 +157,61 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@1.1.1/Chart.min.js"></script>
 <script>
 (function() {
+  var popularBooks = {{ popular_books|tojson }};
+  var popularPageSize = 10;
+  var popularCurrentPage = 1;
+  var popularBody = document.getElementById('popularBooksBody');
+  var popularPrev = document.getElementById('popularPrev');
+  var popularNext = document.getElementById('popularNext');
+
+  function renderPopularPage() {
+    var start = (popularCurrentPage - 1) * popularPageSize;
+    var end = Math.min(start + popularPageSize, popularBooks.length);
+    var rows = [];
+    for (var i = start; i < end; i++) {
+      var book = popularBooks[i];
+      rows.push('<tr>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + (book[0] || '') + '</td>' +
+        '<td>' + (book[1] || 0) + '</td>' +
+        '</tr>');
+    }
+    popularBody.innerHTML = rows.join('');
+    updatePagerState();
+  }
+
+  function updatePagerState() {
+    if (popularCurrentPage <= 1) {
+      popularPrev.classList.add('disabled');
+    } else {
+      popularPrev.classList.remove('disabled');
+    }
+
+    if (popularCurrentPage * popularPageSize >= popularBooks.length) {
+      popularNext.classList.add('disabled');
+    } else {
+      popularNext.classList.remove('disabled');
+    }
+  }
+
+  if (popularPrev && popularNext) {
+    popularPrev.addEventListener('click', function() {
+      if (popularCurrentPage > 1) {
+        popularCurrentPage--;
+        renderPopularPage();
+      }
+    });
+
+    popularNext.addEventListener('click', function() {
+      if (popularCurrentPage * popularPageSize < popularBooks.length) {
+        popularCurrentPage++;
+        renderPopularPage();
+      }
+    });
+  }
+
+  renderPopularPage();
+
   var lendCtx = document.getElementById('lendChart').getContext('2d');
   var labels = [
     {% for date, count in lend_stats %}
