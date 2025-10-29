@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}批量修改分类{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>批量修改分类</h2>
+  <div class="header-actions">
+    <a class="btn btn-default" href="{{ url_for('categories.list_categories') }}">返回列表</a>
+  </div>
+</div>
+<form method="post">
+  <div class="form-group">
+    <label for="bulk-text">分类结构</label>
+    <textarea id="bulk-text" name="bulk_text" class="form-control" rows="15" placeholder="每行一个分类，使用两个空格缩进子分类">{{ bulk_text }}</textarea>
+  </div>
+  <p class="text-muted">使用两个空格缩进来表示子分类关系，可以直接新增或删除行。</p>
+  <button type="submit" class="btn btn-primary">保存修改</button>
+  <a class="btn btn-default" href="{{ url_for('categories.list_categories') }}">取消</a>
+</form>
+{% endblock %}
