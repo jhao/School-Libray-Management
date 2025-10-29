@@ -1,3 +1,8 @@
+:root {
+  --app-topbar-height: 56px;
+  --app-footer-height: 44px;
+}
+
 html,
 body {
   height: 100%;
@@ -8,12 +13,12 @@ body.app-layout {
   min-height: 100vh;
   background-color: #f2f4f7;
   font-size: 13px;
-  padding-top: 56px;
+  padding-top: var(--app-topbar-height);
   overflow: hidden;
 }
 
 .app-topbar {
-  height: 56px;
+  height: var(--app-topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -120,7 +125,7 @@ body.app-layout {
 .app-body {
   display: flex;
   width: 100%;
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--app-topbar-height) - var(--app-footer-height));
   overflow: hidden;
 }
 
@@ -174,6 +179,7 @@ body.app-layout {
   box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
+  padding-bottom: calc(24px + var(--app-footer-height));
 }
 
 .content-wrapper {
@@ -182,6 +188,28 @@ body.app-layout {
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   min-height: 100%;
+}
+
+.app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--app-footer-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  text-align: center;
+  padding: 0 20px;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 1040;
+  font-size: 12px;
+}
+
+.app-footer .footer-content {
+  max-width: 100%;
+  line-height: 1.4;
 }
 
 .table thead th {
@@ -335,7 +363,7 @@ body.app-layout {
 
   .app-sidebar {
     position: fixed;
-    top: 56px;
+    top: var(--app-topbar-height);
     left: 0;
     bottom: 0;
     transform: translateX(-100%);
@@ -344,7 +372,7 @@ body.app-layout {
   }
 
   body.app-layout {
-    padding-top: 56px;
+    padding-top: var(--app-topbar-height);
   }
 
   body.sidebar-open .app-sidebar {
@@ -354,7 +382,7 @@ body.app-layout {
   body.sidebar-open::after {
     content: "";
     position: fixed;
-    top: 56px;
+    top: var(--app-topbar-height);
     left: 0;
     right: 0;
     bottom: 0;
@@ -368,6 +396,6 @@ body.app-layout {
 
   .content-wrapper {
     padding: 16px;
-    min-height: calc(100vh - 88px);
+    min-height: calc(100vh - var(--app-topbar-height) - var(--app-footer-height));
   }
 }
