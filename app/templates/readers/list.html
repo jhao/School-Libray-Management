@@ -3,9 +3,6 @@
 {% block content %}
 <div class="page-header">
   <h2>读者列表</h2>
-  <div class="header-actions">
-    <a class="btn btn-primary" href="{{ url_for('readers.create_reader') }}">新增读者</a>
-  </div>
 </div>
 <div class="panel panel-default">
   <div class="panel-heading">
@@ -33,20 +30,19 @@
       <a class="btn btn-sm btn-default" href="{{ url_for('readers.list_readers') }}">重置</a>
     </form>
   </div>
-  <div class="panel-body">
-    <div class="row">
-      <div class="col-sm-6">
-        <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importReadersModal">导入Excel</button>
-      </div>
-      <div class="col-sm-6 text-right">
-        <a class="btn btn-sm btn-success" href="{{ url_for('readers.export_readers') }}">导出Excel</a>
-      </div>
-    </div>
-  </div>
   <form method="post" action="{{ url_for('readers.bulk_delete_readers') }}" id="bulk-delete-form" onsubmit="return confirm('确认删除选中的读者？');">
     <input type="hidden" name="next" value="{{ request.full_path }}">
-    <div class="bulk-actions">
-      <button type="submit" class="btn btn-sm btn-danger" id="bulk-delete-button" disabled>批量删除</button>
+    <div class="panel-body">
+      <div class="action-toolbar">
+        <div class="action-group">
+          <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importReadersModal">导入Excel</button>
+          <a class="btn btn-sm btn-success" href="{{ url_for('readers.export_readers') }}">导出Excel</a>
+          <button type="submit" class="btn btn-sm btn-danger" id="bulk-delete-button" disabled>批量删除</button>
+        </div>
+        <div class="action-group action-group-right">
+          <a class="btn btn-sm btn-primary" href="{{ url_for('readers.create_reader') }}">新增读者</a>
+        </div>
+      </div>
     </div>
     <table class="table table-striped table-condensed table-hover">
       <thead>
