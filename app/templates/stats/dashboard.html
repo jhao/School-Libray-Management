@@ -25,7 +25,7 @@
     margin-bottom: 15px;
   }
 
-  .book-total-badge {
+  .stats-total-badge {
     background: #f0f5ff;
     color: #1f2d3d;
     font-size: 2.4rem;
@@ -47,9 +47,14 @@
   <div class="col-md-6">
     <div class="inventory-header">
       <h4>图书库存情况</h4>
-      <div class="book-total-badge">{{ book_total }}</div>
+      <div class="stats-total-badge">{{ book_total }}</div>
     </div>
     <p class="text-muted">当前库存统计展示所选时间范围内的图书总量。</p>
+    <div class="inventory-header">
+      <h4>读者数据情况</h4>
+      <div class="stats-total-badge">{{ reader_total }}</div>
+    </div>
+    <p class="text-muted">当前系统中读者账户的总数量。</p>
   </div>
 </div>
 <div class="row">

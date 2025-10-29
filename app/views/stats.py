@@ -54,6 +54,9 @@ def dashboard():
     )
 
     book_total = db.session.query(func.sum(Book.amount)).filter(Book.is_deleted.is_(False)).scalar() or 0
+    reader_total = (
+        db.session.query(func.count(Reader.id)).filter(Reader.is_deleted.is_(False)).scalar() or 0
+    )
     popular_books = (
         db.session.query(Book.name, func.sum(Lend.amount).label("total"))
         .join(Lend, Lend.book_id == Book.id)
@@ -75,6 +78,7 @@ def dashboard():
         return_stats=return_stats,
         grade_stats=grade_stats,
         book_total=book_total,
+        reader_total=reader_total,
         popular_books=popular_books,
         default_start=default_start.date(),
         default_end=default_end.date(),
