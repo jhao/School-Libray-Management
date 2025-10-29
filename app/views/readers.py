@@ -49,24 +49,45 @@ bp = Blueprint("readers", __name__, url_prefix="/readers")
 @login_required
 def list_readers():
     keyword = request.args.get("q", "").strip()
+    grade_id_raw = request.args.get("grade_id", "").strip()
+    class_id_raw = request.args.get("class_id", "").strip()
+    grade_id = int(grade_id_raw) if grade_id_raw.isdigit() else None
+    class_id = int(class_id_raw) if class_id_raw.isdigit() else None
     page, per_page = get_page_args()
     query = Reader.query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Reader.name.like(like)) | (Reader.card_no.like(like)))
+    if grade_id is not None or class_id is not None:
+        query = query.join(Class, Reader.reader_class)
+        if grade_id is not None:
+            query = query.join(Grade, Class.grade).filter(Grade.id == grade_id)
+        if class_id is not None:
+            query = query.filter(Class.id == class_id)
     pagination = query.order_by(Reader.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    classes = (
+    grades = (
+        Grade.query.filter_by(is_deleted=False)
+        .order_by(Grade.name)
+        .all()
+    )
+    classes_query = (
         Class.query.filter_by(is_deleted=False)
         .join(Grade)
         .filter(Grade.is_deleted.is_(False))
-        .order_by(Grade.name, Class.name)
-        .all()
     )
+    if grade_id is not None:
+        classes_query = classes_query.filter(Class.grade_id == grade_id)
+    classes = classes_query.order_by(Grade.name, Class.name).all()
     return render_template(
         "readers/list.html",
         readers=pagination.items,
-        keyword=keyword,
+        filters={
+            "keyword": keyword,
+            "grade_id": grade_id,
+            "class_id": class_id,
+        },
         pagination=pagination,
+        grades=grades,
         classes=classes,
     )
 
@@ -133,6 +154,39 @@ def delete_reader(reader_id: int):
     db.session.commit()
     flash("读者已删除", "success")
     return redirect(url_for("readers.list_readers"))
+
+
+@bp.route("/bulk-delete", methods=["POST"])
+@login_required
+def bulk_delete_readers():
+    reader_ids = request.form.getlist("reader_ids")
+    selected_ids = []
+    for reader_id in reader_ids:
+        try:
+            selected_ids.append(int(reader_id))
+        except (TypeError, ValueError):
+            continue
+
+    next_url = request.form.get("next")
+
+    if not selected_ids:
+        flash("请选择要删除的读者", "warning")
+        return redirect(next_url or url_for("readers.list_readers"))
+
+    readers = (
+        Reader.query.filter(Reader.id.in_(selected_ids))
+        .filter(Reader.is_deleted.is_(False))
+        .all()
+    )
+    if not readers:
+        flash("未找到可删除的读者", "warning")
+        return redirect(next_url or url_for("readers.list_readers"))
+
+    for reader in readers:
+        reader.is_deleted = True
+    db.session.commit()
+    flash(f"已删除 {len(readers)} 名读者", "success")
+    return redirect(next_url or url_for("readers.list_readers"))
 
 
 @bp.route("/import", methods=["POST"])

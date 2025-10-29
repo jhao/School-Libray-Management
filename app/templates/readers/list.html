@@ -11,9 +11,26 @@
   <div class="panel-heading">
     <form class="form-inline" method="get">
       <div class="form-group">
-        <input type="text" name="q" class="form-control input-sm" placeholder="搜索姓名或卡号" value="{{ keyword }}">
+        <input type="text" name="q" class="form-control input-sm" placeholder="搜索姓名或卡号" value="{{ filters.keyword }}">
+      </div>
+      <div class="form-group">
+        <select name="grade_id" class="form-control input-sm">
+          <option value="" {% if filters.grade_id is none %}selected{% endif %}>全部年级</option>
+          {% for grade in grades %}
+          <option value="{{ grade.id }}" {% if filters.grade_id == grade.id %}selected{% endif %}>{{ grade.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <select name="class_id" class="form-control input-sm">
+          <option value="" {% if filters.class_id is none %}selected{% endif %}>全部班级</option>
+          {% for klass in classes %}
+          <option value="{{ klass.id }}" {% if filters.class_id == klass.id %}selected{% endif %}>{{ klass.grade.name if klass.grade else '' }}{{ klass.name }}</option>
+          {% endfor %}
+        </select>
       </div>
       <button class="btn btn-sm btn-primary" type="submit">搜索</button>
+      <a class="btn btn-sm btn-default" href="{{ url_for('readers.list_readers') }}">重置</a>
     </form>
   </div>
   <div class="panel-body">
@@ -26,64 +43,72 @@
       </div>
     </div>
   </div>
-  <table class="table table-striped table-condensed table-hover">
-    <thead>
-      <tr>
-        <th>卡号</th>
-        <th>姓名</th>
-        <th>电话</th>
-        <th>性别</th>
-        <th>年级</th>
-        <th>班级</th>
-        <th>状态</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for reader in readers %}
-      <tr>
-        <td>{{ reader.card_no }}</td>
-        <td>{{ reader.name }}</td>
-        <td>{{ reader.phone }}</td>
-        <td>{{ reader.sex }}</td>
-        <td>{{ reader.reader_class.grade.name if reader.reader_class and reader.reader_class.grade else '' }}</td>
-        <td>{{ reader.reader_class.name if reader.reader_class else '' }}</td>
-        <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
-        <td>
-          <button class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
-          <form method="post" action="{{ url_for('readers.delete_reader', reader_id=reader.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
-            <button type="submit" class="btn btn-xs btn-danger">删除</button>
-          </form>
-        </td>
-      </tr>
-      <tr id="reader-{{ reader.id }}" class="collapse">
-        <td colspan="8">
-          <form method="post" action="{{ url_for('readers.update_reader', reader_id=reader.id) }}" class="form-inline">
-            <input type="text" name="card_no" value="{{ reader.card_no }}" class="form-control input-sm" placeholder="卡号">
-            <input type="text" name="name" value="{{ reader.name }}" class="form-control input-sm" placeholder="姓名">
-            <input type="text" name="phone" value="{{ reader.phone }}" class="form-control input-sm" placeholder="电话">
-            <select name="sex" class="form-control input-sm">
-              <option value="">未填写</option>
-              <option value="男" {% if reader.sex == '男' %}selected{% endif %}>男</option>
-              <option value="女" {% if reader.sex == '女' %}selected{% endif %}>女</option>
-            </select>
-            <select name="class_id" class="form-control input-sm">
-              <option value="">未分配</option>
-              {% for klass in classes %}
-              <option value="{{ klass.id }}" {% if reader.class_id == klass.id %}selected{% endif %}>{{ klass.grade.name if klass.grade else '' }}{{ klass.name }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-sm btn-primary">保存</button>
-          </form>
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="8" class="text-center text-muted">暂无数据</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <form method="post" action="{{ url_for('readers.bulk_delete_readers') }}" id="bulk-delete-form" onsubmit="return confirm('确认删除选中的读者？');">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <div class="bulk-actions">
+      <button type="submit" class="btn btn-sm btn-danger" id="bulk-delete-button" disabled>批量删除</button>
+    </div>
+    <table class="table table-striped table-condensed table-hover">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all-readers"></th>
+          <th>卡号</th>
+          <th>姓名</th>
+          <th>电话</th>
+          <th>性别</th>
+          <th>年级</th>
+          <th>班级</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for reader in readers %}
+        <tr>
+          <td><input type="checkbox" name="reader_ids" value="{{ reader.id }}" class="reader-checkbox"></td>
+          <td>{{ reader.card_no }}</td>
+          <td>{{ reader.name }}</td>
+          <td>{{ reader.phone }}</td>
+          <td>{{ reader.sex }}</td>
+          <td>{{ reader.reader_class.grade.name if reader.reader_class and reader.reader_class.grade else '' }}</td>
+          <td>{{ reader.reader_class.name if reader.reader_class else '' }}</td>
+          <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
+          <td>
+            <button class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
+            <form method="post" action="{{ url_for('readers.delete_reader', reader_id=reader.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
+              <button type="submit" class="btn btn-xs btn-danger">删除</button>
+            </form>
+          </td>
+        </tr>
+        <tr id="reader-{{ reader.id }}" class="collapse">
+          <td colspan="9">
+            <form method="post" action="{{ url_for('readers.update_reader', reader_id=reader.id) }}" class="form-inline">
+              <input type="text" name="card_no" value="{{ reader.card_no }}" class="form-control input-sm" placeholder="卡号">
+              <input type="text" name="name" value="{{ reader.name }}" class="form-control input-sm" placeholder="姓名">
+              <input type="text" name="phone" value="{{ reader.phone }}" class="form-control input-sm" placeholder="电话">
+              <select name="sex" class="form-control input-sm">
+                <option value="">未填写</option>
+                <option value="男" {% if reader.sex == '男' %}selected{% endif %}>男</option>
+                <option value="女" {% if reader.sex == '女' %}selected{% endif %}>女</option>
+              </select>
+              <select name="class_id" class="form-control input-sm">
+                <option value="">未分配</option>
+                {% for klass in classes %}
+                <option value="{{ klass.id }}" {% if reader.class_id == klass.id %}selected{% endif %}>{{ klass.grade.name if klass.grade else '' }}{{ klass.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-primary">保存</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted">暂无数据</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
 </div>
 <div class="modal fade" id="importReadersModal" tabindex="-1" role="dialog" aria-labelledby="importReadersModalLabel">
   <div class="modal-dialog" role="document">
@@ -116,4 +141,37 @@
   </div>
 </div>
 {% include '_pagination.html' %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (function() {
+    var selectAll = document.getElementById('select-all-readers');
+    var checkboxes = document.querySelectorAll('.reader-checkbox');
+    var deleteButton = document.getElementById('bulk-delete-button');
+
+    function updateDeleteButton() {
+      var anyChecked = Array.prototype.slice.call(checkboxes).some(function(box) {
+        return box.checked;
+      });
+      deleteButton.disabled = !anyChecked;
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function() {
+        Array.prototype.forEach.call(checkboxes, function(box) {
+          box.checked = selectAll.checked;
+        });
+        updateDeleteButton();
+      });
+    }
+
+    Array.prototype.forEach.call(checkboxes, function(box) {
+      box.addEventListener('change', updateDeleteButton);
+    });
+
+    updateDeleteButton();
+  })();
+</script>
 {% endblock %}
