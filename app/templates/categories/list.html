@@ -7,49 +7,35 @@
     <a class="btn btn-primary" href="{{ url_for('categories.create_category') }}">新增分类</a>
   </div>
 </div>
-<table class="table table-striped table-condensed table-hover">
+<table class="table table-striped table-condensed table-hover category-tree-table">
   <thead>
     <tr>
-      <th>名称</th>
-      <th>父分类</th>
-      <th>排序</th>
-      <th>操作</th>
+      <th>分类名称</th>
+      <th class="text-center" style="width: 120px;">排序</th>
+      <th class="text-right" style="width: 120px;">操作</th>
     </tr>
   </thead>
   <tbody>
-    {% for category in categories %}
-    <tr>
-      <td>{{ category.name }}</td>
-      <td>{{ category.parent.name if category.parent else '顶级' }}</td>
-      <td>{{ category.sort }}</td>
-      <td>
-        <form method="post" action="{{ url_for('categories.delete_category', category_id=category.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
-          <button type="submit" class="btn btn-xs btn-danger">删除</button>
-        </form>
-      </td>
-    </tr>
+    {% if category_rows %}
+      {% for item in category_rows %}
+      {% set category = item.category %}
+      <tr>
+        <td class="category-name-cell">
+          <span class="tree-label{% if item.has_children %} has-children{% endif %}" style="margin-left: {{ item.depth * 18 }}px;">{{ category.name }}</span>
+        </td>
+        <td class="text-center">{{ category.sort }}</td>
+        <td class="text-right">
+          <form method="post" action="{{ url_for('categories.delete_category', category_id=category.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
+            <button type="submit" class="btn btn-xs btn-danger">删除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
     {% else %}
     <tr>
-      <td colspan="4" class="text-center text-muted">暂无数据</td>
+      <td colspan="3" class="text-center text-muted">暂无数据</td>
     </tr>
-    {% endfor %}
+    {% endif %}
   </tbody>
 </table>
-{% if pagination.pages > 1 %}
-<div class="pagination-wrapper">
-  <ul class="pagination pagination-sm">
-    {% for page_num in pagination.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
-      {% if page_num %}
-        {% if page_num == pagination.page %}
-        <li class="active"><span>{{ page_num }}</span></li>
-        {% else %}
-        <li><a href="{{ url_for('categories.list_categories', page=page_num) }}">{{ page_num }}</a></li>
-        {% endif %}
-      {% else %}
-      <li class="disabled"><span>…</span></li>
-      {% endif %}
-    {% endfor %}
-  </ul>
-</div>
-{% endif %}
 {% endblock %}

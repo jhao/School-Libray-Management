@@ -25,8 +25,11 @@
     <div class="col-sm-6">
       <select name="category_id" class="form-control">
         <option value="">未分类</option>
-        {% for category in categories %}
-        <option value="{{ category.id }}">{{ category.name }}</option>
+        {% for item in category_options %}
+        {% set option = item.category %}
+        {% set indent = '&nbsp;&nbsp;&nbsp;&nbsp;' * item.depth %}
+        {% set prefix = '└ ' if item.depth > 0 else '' %}
+        <option value="{{ option.id }}">{{ indent|safe }}{{ prefix }}{{ option.name }}</option>
         {% endfor %}
       </select>
     </div>

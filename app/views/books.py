@@ -44,6 +44,7 @@ def _ensure_openpyxl() -> Tuple[Optional[WorkbookType], Optional[LoadWorkbookTyp
 
 from ..extensions import db
 from ..models import Book, Category
+from ..utils.category_tree import build_category_tree, flatten_category_tree
 
 
 bp = Blueprint("books", __name__, url_prefix="/books")
@@ -72,8 +73,14 @@ def list_books():
 @login_required
 def create_book():
     if request.method == "GET":
-        categories = Category.query.filter_by(is_deleted=False).order_by(Category.name).all()
-        return render_template("books/create.html", categories=categories)
+        categories = (
+            Category.query.filter_by(is_deleted=False)
+            .order_by(Category.sort, Category.name)
+            .all()
+        )
+        category_tree = build_category_tree(categories)
+        category_options = list(flatten_category_tree(category_tree))
+        return render_template("books/create.html", category_options=category_options)
 
     form = request.form
     isbn = form.get("isbn", "").strip()

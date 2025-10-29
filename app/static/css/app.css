@@ -159,6 +159,38 @@ body.app-layout {
   gap: 10px;
 }
 
+.category-tree-table .category-name-cell {
+  min-width: 240px;
+}
+
+.category-tree-table .tree-label {
+  position: relative;
+  display: inline-block;
+  padding-left: 14px;
+  color: #374151;
+}
+
+.category-tree-table .tree-label.has-children {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.category-tree-table .tree-label::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  transform: translateY(-50%);
+}
+
+.category-tree-table .tree-label.has-children::before {
+  background-color: #f59e0b;
+}
+
 @media (max-width: 991px) {
   .app-sidebar {
     width: 200px;
