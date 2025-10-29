@@ -2,10 +2,11 @@ import io
 from datetime import datetime
 from importlib import import_module
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
+from markupsafe import Markup
 from sqlalchemy.orm import joinedload
 
 if TYPE_CHECKING:  # pragma: no cover - used solely for type checkers
@@ -116,9 +117,6 @@ def create_book():
     if not isbn:
         flash("ISBN不能为空", "danger")
         return redirect(url_for("books.create_book"))
-    if Book.query.filter_by(isbn=isbn).first():
-        flash("该ISBN已存在", "danger")
-        return redirect(url_for("books.create_book"))
 
     amount_raw = (form.get("amount") or "").strip()
     if not amount_raw:
@@ -133,25 +131,72 @@ def create_book():
         flash("数量必须大于0", "danger")
         return redirect(url_for("books.create_book"))
 
+    call_number = form.get("call_number") or None
+    position = form.get("position")
+    category_id_value = int(form.get("category_id")) if form.get("category_id") else None
+    lend_amount = int(form.get("lend_amount", 0) or 0)
+    price = form.get("price") or 0
+    publisher = form.get("publisher")
+    author = form.get("author")
+    version = form.get("version")
+    source = form.get("source")
+    index_id = form.get("index_id")
+    pages = form.get("pages") or None
+    images = form.get("images")
+    summary = form.get("summary")
+    input_num = form.get("input_num") or None
+    remark = form.get("remark")
+
+    existing_active = Book.query.filter_by(isbn=isbn, is_deleted=False).first()
+    if existing_active:
+        flash("该ISBN已存在", "danger")
+        return redirect(url_for("books.create_book"))
+
+    existing_deleted = Book.query.filter_by(isbn=isbn, is_deleted=True).first()
+    if existing_deleted:
+        existing_deleted.name = name
+        existing_deleted.isbn = isbn
+        existing_deleted.call_number = call_number
+        existing_deleted.position = position
+        existing_deleted.category_id = category_id_value
+        existing_deleted.amount = amount
+        existing_deleted.lend_amount = lend_amount
+        existing_deleted.price = price
+        existing_deleted.publisher = publisher
+        existing_deleted.author = author
+        existing_deleted.version = version
+        existing_deleted.source = source
+        existing_deleted.index_id = index_id
+        existing_deleted.pages = pages
+        existing_deleted.images = images
+        existing_deleted.summary = summary
+        existing_deleted.input_num = input_num
+        existing_deleted.remark = remark
+        existing_deleted.updated_by_id = current_user.id
+        existing_deleted.is_deleted = False
+        db.session.commit()
+        flash("图书创建成功", "success")
+        return redirect(url_for("books.list_books"))
+
     book = Book(
         name=name,
         isbn=isbn,
-        call_number=form.get("call_number") or None,
-        position=form.get("position"),
-        category_id=int(form.get("category_id")) if form.get("category_id") else None,
+        call_number=call_number,
+        position=position,
+        category_id=category_id_value,
         amount=amount,
-        lend_amount=int(form.get("lend_amount", 0) or 0),
-        price=form.get("price") or 0,
-        publisher=form.get("publisher"),
-        author=form.get("author"),
-        version=form.get("version"),
-        source=form.get("source"),
-        index_id=form.get("index_id"),
-        pages=form.get("pages") or None,
-        images=form.get("images"),
-        summary=form.get("summary"),
-        input_num=form.get("input_num") or None,
-        remark=form.get("remark"),
+        lend_amount=lend_amount,
+        price=price,
+        publisher=publisher,
+        author=author,
+        version=version,
+        source=source,
+        index_id=index_id,
+        pages=pages,
+        images=images,
+        summary=summary,
+        input_num=input_num,
+        remark=remark,
     )
     book.updated_by_id = current_user.id
     db.session.add(book)
@@ -248,28 +293,88 @@ def import_books():
         wb = load_workbook_fn(file, data_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(min_row=2, values_only=True))
-        count = 0
-        for row in rows:
-            if not row:
+        created_count = 0
+        restored_count = 0
+        skipped: List[str] = []
+
+        for index, row in enumerate(rows, start=2):
+            if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
-            isbn = str(row[1]).strip() if row[1] else None
-            if not isbn or Book.query.filter_by(isbn=isbn).first():
+
+            name_value = str(row[0]).strip() if len(row) > 0 and row[0] else "未命名图书"
+            isbn = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+            if not isbn:
+                skipped.append(f"第{index}行: ISBN 不能为空")
                 continue
+
+            existing_active = Book.query.filter_by(isbn=isbn, is_deleted=False).first()
+            if existing_active:
+                skipped.append(f"第{index}行(ISBN {isbn}): 已存在未删除的图书")
+                continue
+
+            position = row[2] if len(row) > 2 else None
+            raw_amount = row[3] if len(row) > 3 else None
+            try:
+                if raw_amount in (None, ""):
+                    amount = 1
+                else:
+                    amount = int(float(raw_amount))
+            except (TypeError, ValueError):
+                skipped.append(f"第{index}行(ISBN {isbn}): 数量格式不正确")
+                continue
+            if amount <= 0:
+                skipped.append(f"第{index}行(ISBN {isbn}): 数量必须大于0")
+                continue
+
+            price = row[4] if len(row) > 4 else 0
+            publisher = row[5] if len(row) > 5 else None
+            author = row[6] if len(row) > 6 else None
+            summary = row[7] if len(row) > 7 else None
+
+            existing_deleted = Book.query.filter_by(isbn=isbn, is_deleted=True).first()
+            if existing_deleted:
+                existing_deleted.name = name_value or existing_deleted.name or "未命名图书"
+                existing_deleted.position = position
+                existing_deleted.amount = amount
+                existing_deleted.lend_amount = 0
+                existing_deleted.price = price or 0
+                existing_deleted.publisher = publisher
+                existing_deleted.author = author
+                existing_deleted.summary = summary
+                existing_deleted.updated_by_id = current_user.id
+                existing_deleted.is_deleted = False
+                restored_count += 1
+                continue
+
             book = Book(
-                name=row[0] or "未命名图书",
+                name=name_value,
                 isbn=isbn,
-                position=row[2],
-                amount=int(row[3] or 1),
-                price=row[4] or 0,
-                publisher=row[5],
-                author=row[6],
-                summary=row[7],
+                position=position,
+                amount=amount,
+                price=price or 0,
+                publisher=publisher,
+                author=author,
+                summary=summary,
             )
             book.updated_by_id = current_user.id
             db.session.add(book)
-            count += 1
+            created_count += 1
+
         db.session.commit()
-        flash(f"成功导入 {count} 条图书记录", "success")
+
+        success_parts = []
+        if created_count:
+            success_parts.append(f"成功导入 {created_count} 条图书记录")
+        if restored_count:
+            success_parts.append(f"恢复 {restored_count} 条已删除图书记录")
+        if success_parts:
+            flash("，".join(success_parts), "success")
+
+        if skipped:
+            preview = skipped[:100]
+            if len(skipped) > 100:
+                preview.append(f"……共 {len(skipped)} 条错误，仅显示前100条")
+            flash(Markup("部分数据导入失败：<br>" + "<br>".join(preview)), "danger")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
         flash(f"导入失败: {exc}", "danger")

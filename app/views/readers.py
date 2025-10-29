@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
+from markupsafe import Markup
 
 if TYPE_CHECKING:  # pragma: no cover - assists static analysis only
     from openpyxl import Workbook as WorkbookType
@@ -51,10 +52,15 @@ def list_readers():
     keyword = request.args.get("q", "").strip()
     grade_id_raw = request.args.get("grade_id", "").strip()
     class_id_raw = request.args.get("class_id", "").strip()
+    show_deleted = request.args.get("show_deleted") == "1" if current_user.level == "admin" else False
     grade_id = int(grade_id_raw) if grade_id_raw.isdigit() else None
     class_id = int(class_id_raw) if class_id_raw.isdigit() else None
     page, per_page = get_page_args()
-    query = Reader.query.filter_by(is_deleted=False)
+    query = Reader.query
+    if show_deleted:
+        query = query.filter_by(is_deleted=True)
+    else:
+        query = query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Reader.name.like(like)) | (Reader.card_no.like(like)))
@@ -85,6 +91,7 @@ def list_readers():
             "keyword": keyword,
             "grade_id": grade_id,
             "class_id": class_id,
+            "show_deleted": show_deleted,
         },
         pagination=pagination,
         grades=grades,
@@ -111,9 +118,29 @@ def create_reader():
     if not card_no:
         flash("读者卡号不能为空", "danger")
         return redirect(url_for("readers.create_reader"))
-    if Reader.query.filter_by(card_no=card_no).first():
+    existing_active = Reader.query.filter_by(card_no=card_no, is_deleted=False).first()
+    if existing_active:
         flash("卡号已存在", "danger")
         return redirect(url_for("readers.create_reader"))
+
+    class_id_value = int(form.get("class_id")) if form.get("class_id") else None
+    def _apply_reader_fields(reader: Reader) -> None:
+        reader.name = form.get("name", reader.name or "未命名读者")
+        reader.sex = form.get("sex")
+        reader.phone = form.get("phone")
+        reader.cert_type = form.get("cert_type")
+        reader.cert_no = form.get("cert_no")
+        reader.class_id = class_id_value
+
+    existing_deleted = Reader.query.filter_by(card_no=card_no, is_deleted=True).first()
+    if existing_deleted:
+        _apply_reader_fields(existing_deleted)
+        existing_deleted.is_deleted = False
+        existing_deleted.status = "active"
+        db.session.commit()
+        flash("读者创建成功", "success")
+        return redirect(url_for("readers.list_readers"))
+
     reader = Reader(
         card_no=card_no,
         name=form.get("name", "未命名读者"),
@@ -121,7 +148,7 @@ def create_reader():
         phone=form.get("phone"),
         cert_type=form.get("cert_type"),
         cert_no=form.get("cert_no"),
-        class_id=int(form.get("class_id")) if form.get("class_id") else None,
+        class_id=class_id_value,
     )
     db.session.add(reader)
     db.session.commit()
@@ -216,14 +243,27 @@ def import_readers():
         wb = load_workbook_fn(file, data_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(min_row=2, values_only=True))
-        count = 0
-        for row in rows:
-            if not row:
-                continue
-            card_no = str(row[0]).strip() if len(row) > 0 and row[0] else None
-            if not card_no or Reader.query.filter_by(card_no=card_no).first():
+        created_count = 0
+        restored_count = 0
+        skipped: List[str] = []
+
+        for index, row in enumerate(rows, start=2):
+            if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
 
+            card_no = str(row[0]).strip() if len(row) > 0 and row[0] else ""
+            if not card_no:
+                skipped.append(f"第{index}行: 卡号不能为空")
+                continue
+
+            existing_active = Reader.query.filter_by(card_no=card_no, is_deleted=False).first()
+            if existing_active:
+                skipped.append(f"第{index}行(卡号 {card_no}): 卡号已存在")
+                continue
+
+            name_value = str(row[1]).strip() if len(row) > 1 and row[1] else "未命名读者"
+            phone_value = str(row[2]).strip() if len(row) > 2 and row[2] else None
+            sex_value = str(row[3]).strip() if len(row) > 3 and row[3] else None
             grade_name = str(row[4]).strip() if len(row) > 4 and row[4] else ""
             class_name = str(row[5]).strip() if len(row) > 5 and row[5] else ""
             klass = None
@@ -244,17 +284,40 @@ def import_readers():
                         .first()
                     )
 
-            reader = Reader(
-                card_no=card_no,
-                name=(row[1] or "未命名读者") if len(row) > 1 else "未命名读者",
-                phone=row[2] if len(row) > 2 else None,
-                sex=row[3] if len(row) > 3 else None,
-                class_id=klass.id if klass else None,
-            )
+            def _assign(reader: Reader) -> None:
+                reader.name = name_value or reader.name or "未命名读者"
+                reader.phone = phone_value
+                reader.sex = sex_value
+                reader.class_id = klass.id if klass else None
+
+            existing_deleted = Reader.query.filter_by(card_no=card_no, is_deleted=True).first()
+            if existing_deleted:
+                _assign(existing_deleted)
+                existing_deleted.is_deleted = False
+                existing_deleted.status = "active"
+                restored_count += 1
+                continue
+
+            reader = Reader(card_no=card_no)
+            _assign(reader)
             db.session.add(reader)
-            count += 1
+            created_count += 1
+
         db.session.commit()
-        flash(f"成功导入 {count} 条读者记录", "success")
+
+        success_parts = []
+        if created_count:
+            success_parts.append(f"成功导入 {created_count} 条读者记录")
+        if restored_count:
+            success_parts.append(f"恢复 {restored_count} 条已删除读者记录")
+        if success_parts:
+            flash("，".join(success_parts), "success")
+
+        if skipped:
+            preview = skipped[:100]
+            if len(skipped) > 100:
+                preview.append(f"……共 {len(skipped)} 条错误，仅显示前100条")
+            flash(Markup("部分数据导入失败：<br>" + "<br>".join(preview)), "danger")
     except Exception as exc:  # noqa: BLE001
         db.session.rollback()
         flash(f"导入失败: {exc}", "danger")
