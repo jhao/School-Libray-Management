@@ -1,7 +1,7 @@
 from typing import List, Set
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..models import Category
@@ -90,6 +90,9 @@ def update_category(category_id: int):
 @bp.route("/<int:category_id>/delete", methods=["POST"])
 @login_required
 def delete_category(category_id: int):
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("categories.list_categories"))
     category = Category.query.get_or_404(category_id)
     category.is_deleted = True
     db.session.commit()

@@ -26,9 +26,11 @@
         <td class="text-center">{{ category.sort }}</td>
         <td class="text-right">
           <a class="btn btn-xs btn-default" href="{{ url_for('categories.edit_category', category_id=category.id) }}">编辑</a>
+          {% if current_user.level == 'admin' %}
           <form method="post" action="{{ url_for('categories.delete_category', category_id=category.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
             <button type="submit" class="btn btn-xs btn-danger">删除</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

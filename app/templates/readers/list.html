@@ -10,7 +10,9 @@
       <div class="action-group">
         <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importReadersModal">导入Excel</button>
         <a class="btn btn-sm btn-success" href="{{ url_for('readers.export_readers') }}">导出Excel</a>
+        {% if current_user.level == 'admin' %}
         <button type="submit" class="btn btn-sm btn-danger" id="bulk-delete-button" form="bulk-delete-form" disabled>批量删除</button>
+        {% endif %}
       </div>
       <div class="action-group action-group-right">
         <a class="btn btn-sm btn-primary" href="{{ url_for('readers.create_reader') }}">新增读者</a>
@@ -70,9 +72,11 @@
           <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
           <td>
             <button type="button" class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
+            {% if current_user.level == 'admin' %}
             <form method="post" action="{{ url_for('readers.delete_reader', reader_id=reader.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
               <button type="submit" class="btn btn-xs btn-danger">删除</button>
             </form>
+            {% endif %}
           </td>
         </tr>
         <tr id="reader-{{ reader.id }}" class="collapse">
@@ -148,6 +152,9 @@
     var deleteButton = document.getElementById('bulk-delete-button');
 
     function updateDeleteButton() {
+      if (!deleteButton) {
+        return;
+      }
       var anyChecked = Array.prototype.slice.call(checkboxes).some(function(box) {
         return box.checked;
       });
@@ -167,7 +174,9 @@
       box.addEventListener('change', updateDeleteButton);
     });
 
-    updateDeleteButton();
+    if (deleteButton) {
+      updateDeleteButton();
+    }
   })();
 </script>
 {% endblock %}

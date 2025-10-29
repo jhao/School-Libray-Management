@@ -5,7 +5,7 @@ from importlib.util import find_spec
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 if TYPE_CHECKING:  # pragma: no cover - assists static analysis only
     from openpyxl import Workbook as WorkbookType
@@ -149,6 +149,9 @@ def update_reader(reader_id: int):
 @bp.route("/<int:reader_id>/delete", methods=["POST"])
 @login_required
 def delete_reader(reader_id: int):
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("readers.list_readers"))
     reader = Reader.query.get_or_404(reader_id)
     reader.is_deleted = True
     db.session.commit()
@@ -159,6 +162,9 @@ def delete_reader(reader_id: int):
 @bp.route("/bulk-delete", methods=["POST"])
 @login_required
 def bulk_delete_readers():
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("readers.list_readers"))
     reader_ids = request.form.getlist("reader_ids")
     selected_ids = []
     for reader_id in reader_ids:
@@ -400,6 +406,9 @@ def create_grade():
 @bp.route("/grades/<int:grade_id>/delete", methods=["POST"])
 @login_required
 def delete_grade(grade_id: int):
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("readers.manage_grades"))
     grade = Grade.query.get_or_404(grade_id)
     grade.is_deleted = True
     db.session.commit()
@@ -484,6 +493,9 @@ def create_class():
 @bp.route("/classes/<int:class_id>/delete", methods=["POST"])
 @login_required
 def delete_class(class_id: int):
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("readers.manage_classes"))
     klass = Class.query.get_or_404(class_id)
     klass.is_deleted = True
     db.session.commit()
