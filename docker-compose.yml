@@ -1,0 +1,28 @@
+version: '3.9'
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: library
+      MYSQL_USER: library
+      MYSQL_PASSWORD: library
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    command: ["mysqld", "--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+
+  web:
+    build: .
+    restart: always
+    environment:
+      SECRET_KEY: change-me
+      DATABASE_URI: mysql+pymysql://library:library@db/library
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+volumes:
+  db_data:

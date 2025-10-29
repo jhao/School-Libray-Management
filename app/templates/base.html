@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}图书馆管理系统{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  </head>
+  <body>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="{{ url_for('stats.dashboard') }}">学校图书馆管理</a>
+        </div>
+        <ul class="nav navbar-nav">
+          <li><a href="{{ url_for('books.list_books') }}">图书</a></li>
+          <li><a href="{{ url_for('categories.list_categories') }}">分类</a></li>
+          <li class="dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">读者 <span class="caret"></span></a>
+            <ul class="dropdown-menu">
+              <li><a href="{{ url_for('readers.list_readers') }}">读者管理</a></li>
+              <li><a href="{{ url_for('readers.manage_grades') }}">年级管理</a></li>
+              <li><a href="{{ url_for('readers.manage_classes') }}">班级管理</a></li>
+            </ul>
+          </li>
+          <li class="dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">借阅 <span class="caret"></span></a>
+            <ul class="dropdown-menu">
+              <li><a href="{{ url_for('lending.borrow') }}">借书</a></li>
+              <li><a href="{{ url_for('lending.return_book') }}">归还</a></li>
+            </ul>
+          </li>
+          <li><a href="{{ url_for('stats.dashboard') }}">统计分析</a></li>
+          <li><a href="{{ url_for('system.list_users') }}">系统管理</a></li>
+        </ul>
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="{{ url_for('auth.logout') }}">退出</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="container-fluid main-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="row">
+            <div class="col-xs-12">
+              {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissable">
+                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                {{ message }}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/js/bootstrap.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>

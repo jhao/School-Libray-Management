@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}统计分析{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-xs-12">
+    <form class="form-inline" method="get">
+      <div class="form-group">
+        <label>开始日期</label>
+        <input type="date" name="start" value="{{ default_start }}" class="form-control input-sm">
+      </div>
+      <div class="form-group">
+        <label>结束日期</label>
+        <input type="date" name="end" value="{{ default_end }}" class="form-control input-sm">
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">刷新</button>
+    </form>
+  </div>
+</div>
+<hr>
+<div class="row">
+  <div class="col-md-6">
+    <h4>借阅与归还趋势</h4>
+    <canvas id="lendChart" height="200"></canvas>
+  </div>
+  <div class="col-md-6">
+    <h4>图书库存情况</h4>
+    <p>图书总数：<strong>{{ book_total }}</strong></p>
+    <div class="panel panel-default">
+      <div class="panel-heading">最受欢迎TOP50</div>
+      <table class="table table-condensed table-hover">
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>书名</th>
+            <th>借阅总数</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for book in popular_books %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ book[0] }}</td>
+            <td>{{ book[1] or 0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-xs-12">
+    <h4>各年级班级借阅统计</h4>
+    <table class="table table-striped table-condensed table-hover">
+      <thead>
+        <tr>
+          <th>年级</th>
+          <th>班级</th>
+          <th>总计借出</th>
+          <th>总计归还</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in grade_stats %}
+        <tr>
+          <td>{{ row.grade }}</td>
+          <td>{{ row.class }}</td>
+          <td>{{ row.lend_count }}</td>
+          <td>{{ row.return_count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-6">
+    <h4>图书借阅超期情况</h4>
+    <ul class="list-group">
+      <li class="list-group-item">超过1年未归还：<span class="badge">{{ overdue_1y }}</span></li>
+      <li class="list-group-item">6-12个月未归还：<span class="badge">{{ overdue_6_12 }}</span></li>
+      <li class="list-group-item">1-6个月未归还：<span class="badge">{{ overdue_6 }}</span></li>
+      <li class="list-group-item">近一个月未归还：<span class="badge">{{ overdue_1m }}</span></li>
+    </ul>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@1.1.1/Chart.min.js"></script>
+<script>
+(function() {
+  var lendCtx = document.getElementById('lendChart').getContext('2d');
+  var labels = [
+    {% for date, count in lend_stats %}
+      '{{ date }}',
+    {% endfor %}
+  ];
+  var lendData = [
+    {% for date, count in lend_stats %}
+      {{ count }},
+    {% endfor %}
+  ];
+  var returnLabels = [
+    {% for date, count in return_stats %}
+      '{{ date }}',
+    {% endfor %}
+  ];
+  var returnData = [
+    {% for date, count in return_stats %}
+      {{ count }},
+    {% endfor %}
+  ];
+  var dataMap = {};
+  labels.forEach(function(label, index) { dataMap[label] = { lend: lendData[index], ret: 0 }; });
+  returnLabels.forEach(function(label, index) {
+    if (!dataMap[label]) { dataMap[label] = { lend: 0, ret: returnData[index] }; }
+    else { dataMap[label].ret = returnData[index]; }
+  });
+  var mergedLabels = Object.keys(dataMap).sort();
+  var mergedLend = [], mergedReturn = [];
+  mergedLabels.forEach(function(label) {
+    mergedLend.push(dataMap[label].lend || 0);
+    mergedReturn.push(dataMap[label].ret || 0);
+  });
+  new Chart(lendCtx).Line({
+    labels: mergedLabels,
+    datasets: [
+      {
+        label: '借出',
+        fillColor: 'rgba(52,152,219,0.2)',
+        strokeColor: '#3498db',
+        pointColor: '#2980b9',
+        data: mergedLend
+      },
+      {
+        label: '归还',
+        fillColor: 'rgba(46,204,113,0.2)',
+        strokeColor: '#27ae60',
+        pointColor: '#1e8449',
+        data: mergedReturn
+      }
+    ]
+  }, { responsive: true });
+})();
+</script>
+{% endblock %}
