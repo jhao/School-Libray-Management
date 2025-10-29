@@ -25,7 +25,10 @@
   <div class="form-group">
     <label class="col-sm-2 control-label">Topbar颜色</label>
     <div class="col-sm-3">
-      <input type="color" name="topbar_color" class="form-control" value="{{ topbar_color }}">
+      <input type="color" name="topbar_color" id="topbar-color-input" class="form-control" value="{{ topbar_color }}">
+    </div>
+    <div class="col-sm-3">
+      <button type="button" class="btn btn-default" id="reset-topbar-color">恢复默认颜色</button>
     </div>
   </div>
   <div class="form-group">
@@ -34,4 +37,39 @@
     </div>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (function() {
+    var colorInput = document.getElementById('topbar-color-input');
+    var resetButton = document.getElementById('reset-topbar-color');
+    var defaultColor = {{ default_topbar_color | tojson }};
+
+    function applyColor(color) {
+      var topbar = document.querySelector('.app-topbar');
+      if (topbar) {
+        topbar.style.backgroundColor = color;
+      }
+      var sidebar = document.getElementById('app-sidebar');
+      if (sidebar) {
+        sidebar.style.backgroundColor = color;
+      }
+    }
+
+    if (colorInput) {
+      colorInput.addEventListener('input', function() {
+        applyColor(colorInput.value);
+      });
+    }
+
+    if (resetButton && colorInput) {
+      resetButton.addEventListener('click', function() {
+        colorInput.value = defaultColor;
+        applyColor(defaultColor);
+      });
+    }
+  })();
+</script>
 {% endblock %}

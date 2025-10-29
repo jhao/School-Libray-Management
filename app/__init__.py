@@ -3,6 +3,7 @@ from pathlib import Path
 
 from flask import Flask, request
 
+from .constants import DEFAULT_BRAND_COLOR
 from .extensions import db, migrate, login_manager
 from .models import SystemSetting, User
 from .utils.pagination import (
@@ -111,7 +112,7 @@ def create_app(test_config=None):
     @app.context_processor
     def inject_system_settings():
         logo_path = SystemSetting.get_value("system_logo") or ""
-        topbar_color = SystemSetting.get_value("topbar_color") or "#1f2d3d"
+        topbar_color = SystemSetting.get_value("topbar_color") or DEFAULT_BRAND_COLOR
         current_endpoint = request.endpoint or ""
         nav_sections = [
             {
@@ -124,6 +125,7 @@ def create_app(test_config=None):
         return {
             "system_logo_path": logo_path,
             "system_topbar_color": topbar_color,
+            "system_sidebar_color": topbar_color,
             "system_nav_sections": nav_sections,
             "system_active_nav_key": _resolve_active_section(current_endpoint),
         }

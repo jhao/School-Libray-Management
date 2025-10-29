@@ -1,0 +1,1 @@
+DEFAULT_BRAND_COLOR = "#1f2d3d"

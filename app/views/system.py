@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import OperationalError
 
+from ..constants import DEFAULT_BRAND_COLOR
 from ..extensions import db
 from ..models import SystemSetting, User
 from ..utils.pagination import get_page_args
@@ -104,10 +105,10 @@ def system_settings():
         return redirect(url_for("stats.dashboard"))
 
     current_logo = SystemSetting.get_value("system_logo") or ""
-    current_color = SystemSetting.get_value("topbar_color") or "#1f2d3d"
+    current_color = SystemSetting.get_value("topbar_color") or DEFAULT_BRAND_COLOR
 
     if request.method == "POST":
-        color = request.form.get("topbar_color", current_color).strip() or "#1f2d3d"
+        color = request.form.get("topbar_color", current_color).strip() or DEFAULT_BRAND_COLOR
         try:
             SystemSetting.set_value("topbar_color", color)
         except OperationalError:
@@ -163,4 +164,5 @@ def system_settings():
         "system/settings.html",
         topbar_color=current_color,
         logo_path=current_logo,
+        default_topbar_color=DEFAULT_BRAND_COLOR,
     )
