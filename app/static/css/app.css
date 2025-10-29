@@ -1,0 +1,21 @@
+body {
+  padding-top: 60px;
+  font-size: 13px;
+}
+
+.main-container {
+  padding-top: 15px;
+}
+
+.navbar-brand {
+  font-weight: bold;
+}
+
+.table-condensed > tbody > tr > td,
+.table-condensed > thead > tr > th {
+  padding: 6px;
+}
+
+.panel-heading .form-inline .form-control {
+  width: auto;
+}
