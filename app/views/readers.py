@@ -2,7 +2,7 @@ import io
 from datetime import datetime
 from importlib import import_module
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
@@ -247,6 +247,25 @@ def import_readers():
         restored_count = 0
         skipped: List[str] = []
 
+        grade_names = [grade.name for grade in Grade.query.filter_by(is_deleted=False).all() if grade.name]
+        grade_names.sort(key=len, reverse=True)
+        active_classes = (
+            Class.query.filter_by(is_deleted=False)
+            .join(Grade)
+            .filter(Grade.is_deleted.is_(False))
+            .all()
+        )
+        class_display_map: Dict[str, Class] = {}
+        class_by_grade_and_name: Dict[Tuple[str, str], Class] = {}
+        class_by_name_only: Dict[str, List[Class]] = {}
+        for klass in active_classes:
+            grade_name = klass.grade.name if klass.grade else ""
+            display_name = f"{grade_name}{klass.name}" if grade_name else klass.name
+            class_display_map[display_name] = klass
+            if grade_name:
+                class_by_grade_and_name[(grade_name, klass.name)] = klass
+            class_by_name_only.setdefault(klass.name, []).append(klass)
+
         for index, row in enumerate(rows, start=2):
             if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
@@ -264,25 +283,22 @@ def import_readers():
             name_value = str(row[1]).strip() if len(row) > 1 and row[1] else "未命名读者"
             phone_value = str(row[2]).strip() if len(row) > 2 and row[2] else None
             sex_value = str(row[3]).strip() if len(row) > 3 and row[3] else None
-            grade_name = str(row[4]).strip() if len(row) > 4 and row[4] else ""
-            class_name = str(row[5]).strip() if len(row) > 5 and row[5] else ""
+            class_value = str(row[4]).strip() if len(row) > 4 and row[4] else ""
             klass = None
-            if class_name:
-                class_query = Class.query.filter_by(name=class_name, is_deleted=False)
-                if grade_name:
-                    grade = Grade.query.filter_by(name=grade_name, is_deleted=False).first()
-                    if grade:
-                        klass = class_query.filter_by(grade_id=grade.id).first()
+            if class_value:
+                klass = class_display_map.get(class_value)
                 if klass is None:
-                    klass = class_query.join(Grade).filter(Grade.is_deleted.is_(False)).first()
-            elif grade_name:
-                grade = Grade.query.filter_by(name=grade_name, is_deleted=False).first()
-                if grade:
-                    klass = (
-                        Class.query.filter_by(is_deleted=False, grade_id=grade.id)
-                        .order_by(Class.name)
-                        .first()
-                    )
+                    for grade_name in grade_names:
+                        if class_value.startswith(grade_name):
+                            remainder = class_value[len(grade_name) :].strip()
+                            if remainder:
+                                klass = class_by_grade_and_name.get((grade_name, remainder))
+                            if klass:
+                                break
+                    if klass is None:
+                        candidates = class_by_name_only.get(class_value, [])
+                        if candidates:
+                            klass = candidates[0]
 
             def _assign(reader: Reader) -> None:
                 reader.name = name_value or reader.name or "未命名读者"
@@ -336,9 +352,8 @@ def download_reader_template():
     wb = workbook_cls()
     ws = wb.active
     ws.title = "读者信息"
-    ws.append(["卡号", "姓名", "电话", "性别", "年级", "班级"])
+    ws.append(["卡号", "姓名", "电话", "性别", "班级"])
 
-    grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
     classes = (
         Class.query.filter_by(is_deleted=False)
         .join(Grade)
@@ -347,14 +362,14 @@ def download_reader_template():
         .all()
     )
 
-    data_sheet = wb.create_sheet("年级班级信息")
-    data_sheet.append(["年级", "班级"])
-    for idx, grade in enumerate(grades, start=2):
-        data_sheet.cell(row=idx, column=1, value=grade.name)
+    data_sheet = wb.create_sheet("班级信息")
+    data_sheet.append(["班级", "年级", "班级名称"])
     for idx, klass in enumerate(classes, start=2):
         grade_name = klass.grade.name if klass.grade else ""
         display_name = f"{grade_name}{klass.name}" if grade_name else klass.name
-        data_sheet.cell(row=idx, column=2, value=display_name)
+        data_sheet.cell(row=idx, column=1, value=display_name)
+        data_sheet.cell(row=idx, column=2, value=grade_name)
+        data_sheet.cell(row=idx, column=3, value=klass.name)
     data_sheet.sheet_state = "hidden"
 
     try:
@@ -376,18 +391,9 @@ def download_reader_template():
 
     if DataValidation and get_column_letter:
         max_rows = 500
-        grade_column = get_column_letter(5)
-        class_column = get_column_letter(6)
-        if grades:
-            grade_list_ref = f"={_quote_sheet_name(data_sheet.title)}!$A$2:$A${len(grades) + 1}"
-            grade_range = f"{grade_column}2:{grade_column}{max_rows}"
-            grade_validation = DataValidation(type="list", formula1=grade_list_ref, allow_blank=True)
-            grade_validation.error = "请选择下拉列表中的年级"
-            grade_validation.errorTitle = "无效的年级"
-            ws.add_data_validation(grade_validation)
-            grade_validation.add(grade_range)
+        class_column = get_column_letter(5)
         if classes:
-            class_list_ref = f"={_quote_sheet_name(data_sheet.title)}!$B$2:$B${len(classes) + 1}"
+            class_list_ref = f"={_quote_sheet_name(data_sheet.title)}!$A$2:$A${len(classes) + 1}"
             class_range = f"{class_column}2:{class_column}{max_rows}"
             class_validation = DataValidation(type="list", formula1=class_list_ref, allow_blank=True)
             class_validation.error = "请选择下拉列表中的班级"
