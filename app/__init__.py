@@ -15,8 +15,12 @@ def create_app(test_config=None):
     if not database_uri.strip():
         database_uri = f"sqlite:///{default_sqlite_path}"
 
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key or not secret_key.strip():
+        secret_key = "dev-secret-key"
+
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
+        SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
