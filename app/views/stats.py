@@ -53,9 +53,26 @@ def dashboard():
         .all()
     )
 
-    book_total = db.session.query(func.sum(Book.amount)).filter(Book.is_deleted.is_(False)).scalar() or 0
+    book_inventory_total = (
+        db.session.query(func.coalesce(func.sum(Book.amount - Book.lend_amount), 0))
+        .filter(Book.is_deleted.is_(False))
+        .scalar()
+        or 0
+    )
+    book_isbn_total = (
+        db.session.query(func.count(func.distinct(Book.isbn)))
+        .filter(Book.is_deleted.is_(False))
+        .scalar()
+        or 0
+    )
     reader_total = (
         db.session.query(func.count(Reader.id)).filter(Reader.is_deleted.is_(False)).scalar() or 0
+    )
+    active_reader_total = (
+        db.session.query(func.count(func.distinct(Lend.reader_id)))
+        .filter(Lend.status == "lent", Lend.is_deleted.is_(False))
+        .scalar()
+        or 0
     )
     popular_books_query = (
         db.session.query(Book.name, func.sum(Lend.amount).label("total"))
@@ -75,14 +92,17 @@ def dashboard():
     overdue_6_12 = get_overdue_between(180, 365)
     overdue_6 = get_overdue_between(30, 180)
     overdue_1m = get_overdue_between(0, 30)
+    recent_unreturned = get_recent_borrowed_unreturned(30)
 
     return render_template(
         "stats/dashboard.html",
         lend_stats=lend_stats,
         return_stats=return_stats,
         grade_stats=grade_stats,
-        book_total=book_total,
+        book_inventory_total=book_inventory_total,
+        book_isbn_total=book_isbn_total,
         reader_total=reader_total,
+        active_reader_total=active_reader_total,
         popular_books=popular_books,
         default_start=default_start.date(),
         default_end=default_end.date(),
@@ -90,6 +110,7 @@ def dashboard():
         overdue_6_12=overdue_6_12,
         overdue_6=overdue_6,
         overdue_1m=overdue_1m,
+        recent_unreturned=recent_unreturned,
     )
 
 
@@ -113,6 +134,20 @@ def get_overdue_between(min_days: int, max_days: int) -> int:
             Lend.status == "lent",
             Lend.due_date >= min_deadline,
             Lend.due_date < max_deadline,
+            Lend.is_deleted.is_(False),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def get_recent_borrowed_unreturned(days: int) -> int:
+    since = datetime.utcnow() - timedelta(days=days)
+    return (
+        db.session.query(func.count(Lend.id))
+        .filter(
+            Lend.status == "lent",
+            Lend.created_at >= since,
             Lend.is_deleted.is_(False),
         )
         .scalar()
