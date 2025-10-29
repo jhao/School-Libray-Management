@@ -45,7 +45,28 @@
           <td>{{ lend.reader.name }} ({{ lend.reader.card_no }})</td>
           <td>{{ lend.book.name }} ({{ lend.book.isbn }})</td>
           <td>{{ lend.amount }}</td>
-          <td>{{ lend.due_date.strftime('%Y-%m-%d') }}</td>
+          {% if lend.due_date %}
+          {% set due_class = '' %}
+          {% if lend.status == 'returned' %}
+            {% set due_class = 'due-returned' %}
+          {% else %}
+            {% set days_diff = (lend.due_date.date() - current_time.date()).days %}
+            {% if days_diff >= 30 %}
+              {% set due_class = 'due-safe' %}
+            {% elif days_diff >= 10 %}
+              {% set due_class = 'due-warning' %}
+            {% elif days_diff >= 0 %}
+              {% set due_class = 'due-urgent' %}
+            {% else %}
+              {% set due_class = 'due-overdue' %}
+            {% endif %}
+          {% endif %}
+          <td>
+            <span class="due-label {{ due_class }}">{{ lend.due_date.strftime('%Y-%m-%d') }}</span>
+          </td>
+          {% else %}
+          <td>—</td>
+          {% endif %}
           <td>{{ lend.borrow_operator.username if lend.borrow_operator else '—' }}</td>
           <td>{{ '已归还' if lend.status == 'returned' else '借出中' }}</td>
         </tr>
