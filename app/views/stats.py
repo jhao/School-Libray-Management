@@ -57,7 +57,7 @@ def dashboard():
     reader_total = (
         db.session.query(func.count(Reader.id)).filter(Reader.is_deleted.is_(False)).scalar() or 0
     )
-    popular_books = (
+    popular_books_query = (
         db.session.query(Book.name, func.sum(Lend.amount).label("total"))
         .join(Lend, Lend.book_id == Book.id)
         .filter(Book.is_deleted.is_(False))
@@ -66,6 +66,10 @@ def dashboard():
         .limit(50)
         .all()
     )
+    popular_books = [
+        {"name": name, "total": total or 0}
+        for name, total in popular_books_query
+    ]
 
     overdue_1y = get_overdue_count(365)
     overdue_6_12 = get_overdue_between(180, 365)
