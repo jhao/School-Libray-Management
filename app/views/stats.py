@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, render_template, request
 from flask_login import login_required
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 
 from ..extensions import db
 from ..models import Book, Class, Grade, Lend, Reader, ReturnRecord
@@ -19,10 +19,20 @@ def dashboard():
     default_end = datetime.utcnow()
     default_start = default_end - timedelta(days=30)
 
+    grade_start = request.args.get("grade_start")
+    grade_end = request.args.get("grade_end")
+    grade_start_dt = None
+    grade_end_dt = None
+
     if start_date:
         default_start = datetime.fromisoformat(start_date)
     if end_date:
         default_end = datetime.fromisoformat(end_date)
+
+    if grade_start:
+        grade_start_dt = datetime.fromisoformat(grade_start)
+    if grade_end:
+        grade_end_dt = datetime.fromisoformat(grade_end) + timedelta(days=1)
 
     lend_stats = (
         db.session.query(func.date(Lend.created_at), func.count(Lend.id))
@@ -37,12 +47,50 @@ def dashboard():
         .all()
     )
 
+    lend_case_conditions = []
+    return_case_conditions = []
+
+    if grade_start_dt:
+        lend_case_conditions.append(Lend.created_at >= grade_start_dt)
+        return_case_conditions.append(ReturnRecord.created_at >= grade_start_dt)
+    if grade_end_dt:
+        lend_case_conditions.append(Lend.created_at < grade_end_dt)
+        return_case_conditions.append(ReturnRecord.created_at < grade_end_dt)
+
+    lend_case_expr = Lend.id
+    if lend_case_conditions:
+        lend_case_expr = case(
+            [
+                (
+                    and_(*lend_case_conditions)
+                    if len(lend_case_conditions) > 1
+                    else lend_case_conditions[0],
+                    Lend.id,
+                )
+            ],
+            else_=None,
+        )
+
+    return_case_expr = ReturnRecord.id
+    if return_case_conditions:
+        return_case_expr = case(
+            [
+                (
+                    and_(*return_case_conditions)
+                    if len(return_case_conditions) > 1
+                    else return_case_conditions[0],
+                    ReturnRecord.id,
+                )
+            ],
+            else_=None,
+        )
+
     grade_stats = (
         db.session.query(
             Grade.name.label("grade"),
             Class.name.label("class"),
-            func.count(func.distinct(Lend.id)).label("lend_count"),
-            func.count(func.distinct(ReturnRecord.id)).label("return_count"),
+            func.count(func.distinct(lend_case_expr)).label("lend_count"),
+            func.count(func.distinct(return_case_expr)).label("return_count"),
         )
         .join(Class, Class.grade_id == Grade.id)
         .outerjoin(Reader, Reader.class_id == Class.id)
@@ -99,6 +147,8 @@ def dashboard():
         lend_stats=lend_stats,
         return_stats=return_stats,
         grade_stats=grade_stats,
+        grade_start=grade_start,
+        grade_end=grade_end,
         book_inventory_total=book_inventory_total,
         book_isbn_total=book_isbn_total,
         reader_total=reader_total,
