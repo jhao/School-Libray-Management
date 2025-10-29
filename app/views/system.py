@@ -518,6 +518,13 @@ def backup_restore():
 
     database_path = _get_database_path()
     database_exists = bool(database_path and os.path.exists(database_path))
+
+    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    try:
+        url = make_url(uri)
+        database_backend = url.get_backend_name()
+    except Exception:
+        database_backend = None
     if request.method == "POST" and not database_exists:
         flash("当前数据库不支持备份或数据库文件不存在。", "danger")
 
@@ -586,6 +593,7 @@ def backup_restore():
     return render_template(
         "system/backup_restore.html",
         database_exists=database_exists,
+        database_backend=database_backend,
         logs=logs,
     )
 
