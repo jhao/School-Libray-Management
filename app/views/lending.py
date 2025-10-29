@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import case, func
 from sqlalchemy.orm import selectinload
 
 from ..extensions import db
@@ -193,6 +194,24 @@ def records():
             end_date_raw = ""
 
     page, per_page = get_page_args()
+    stats_result = (
+        query.with_entities(
+            func.count(Lend.id),
+            func.coalesce(func.sum(Lend.amount), 0),
+            func.coalesce(func.sum(case((Lend.status == "lent", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Lend.status == "returned", 1), else_=0)), 0),
+        )
+        .order_by(None)
+        .first()
+    )
+
+    summary = {
+        "total_records": stats_result[0] if stats_result else 0,
+        "total_amount": stats_result[1] if stats_result else 0,
+        "lent_count": stats_result[2] if stats_result else 0,
+        "returned_count": stats_result[3] if stats_result else 0,
+    }
+
     pagination = query.order_by(Lend.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -230,6 +249,7 @@ def records():
         grades=grades,
         classes=classes,
         filters=filters,
+        summary=summary,
         current_time=datetime.utcnow(),
     )
 

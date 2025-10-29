@@ -69,14 +69,14 @@
   <div class="col-md-6">
     <div class="inventory-header">
       <h4>图书库存情况</h4>
-      <div class="stats-total-badge">{{ book_total }}</div>
+      <div class="stats-total-badge">{{ book_inventory_total }}/{{ book_isbn_total }}</div>
     </div>
-    <p class="text-muted">当前库存统计展示所选时间范围内的图书总量。</p>
+    <p class="text-muted">图书库存总册数 / 图书ISBN种类数量。</p>
     <div class="inventory-header">
       <h4>读者数据情况</h4>
-      <div class="stats-total-badge">{{ reader_total }}</div>
+      <div class="stats-total-badge">{{ reader_total }}/{{ active_reader_total }}</div>
     </div>
-    <p class="text-muted">当前系统中读者账户的总数量。</p>
+    <p class="text-muted">读者账户总数 / 当前有借阅的读者数。</p>
   </div>
 </div>
 <div class="row">
@@ -108,6 +108,7 @@
   <div class="col-md-6">
     <h4>图书借阅超期情况</h4>
     <ul class="list-group">
+      <li class="list-group-item">一个月内借出未归还：<span class="badge">{{ recent_unreturned }}</span></li>
       <li class="list-group-item">超过1年未归还：<span class="badge">{{ overdue_1y }}</span></li>
       <li class="list-group-item">6-12个月未归还：<span class="badge">{{ overdue_6_12 }}</span></li>
       <li class="list-group-item">1-6个月未归还：<span class="badge">{{ overdue_6 }}</span></li>
