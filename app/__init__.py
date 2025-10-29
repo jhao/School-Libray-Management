@@ -15,11 +15,12 @@ from .utils.pagination import (
 NAV_SECTIONS = [
     {
         "key": "common",
-        "title": "常用功能",
+        "title": "借阅管理",
         "items": [
             {"endpoint": "stats.dashboard", "label": "统计分析"},
             {"endpoint": "lending.borrow", "label": "借书"},
             {"endpoint": "lending.return_book", "label": "还书"},
+            {"endpoint": "lending.records", "label": "借阅记录"},
         ],
         "prefixes": ["stats.", "lending."],
     },
