@@ -1,0 +1,43 @@
+<div class="pagination-wrapper">
+  <form method="get" class="pagination-controls">
+    {% for key, values in request.args.lists() %}
+      {% if key not in ['page', 'per_page'] %}
+        {% for value in values %}
+          <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    {% set total_pages = pagination.pages if pagination.pages else 1 %}
+    <label class="pagination-select">
+      每页
+      <select name="per_page" class="form-control input-sm" onchange="this.form.page.value = 1; this.form.submit();">
+        {% for option in pagination_per_page_options %}
+          <option value="{{ option }}" {% if option == pagination.per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+      条
+    </label>
+    <label class="pagination-jump">
+      跳转到
+      <input type="number" name="page" min="1" max="{{ total_pages }}" value="{{ pagination.page }}" class="form-control input-sm pagination-jump-input">
+      页
+    </label>
+    <button type="submit" class="btn btn-sm btn-default">跳转</button>
+  </form>
+  {% if pagination.pages > 1 %}
+    {% set page_links = build_pagination_links(pagination) %}
+    <ul class="pagination pagination-sm">
+      {% for page_num in page_links %}
+        {% if page_num %}
+          {% if page_num == pagination.page %}
+            <li class="active"><span>{{ page_num }}</span></li>
+          {% else %}
+            <li><a href="{{ pagination_build_url(page_num, pagination.per_page) }}">{{ page_num }}</a></li>
+          {% endif %}
+        {% else %}
+          <li class="disabled"><span>…</span></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>

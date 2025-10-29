@@ -39,6 +39,7 @@ def _ensure_openpyxl() -> Tuple[Optional[WorkbookType], Optional[LoadWorkbookTyp
 
 from ..extensions import db
 from ..models import Class, Grade, Reader
+from ..utils.pagination import get_page_args
 
 
 bp = Blueprint("readers", __name__, url_prefix="/readers")
@@ -48,8 +49,7 @@ bp = Blueprint("readers", __name__, url_prefix="/readers")
 @login_required
 def list_readers():
     keyword = request.args.get("q", "").strip()
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = get_page_args()
     query = Reader.query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"
@@ -319,8 +319,7 @@ def export_readers():
 @bp.route("/grades")
 @login_required
 def manage_grades():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = get_page_args()
     pagination = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -357,8 +356,7 @@ def delete_grade(grade_id: int):
 @bp.route("/classes")
 @login_required
 def manage_classes():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = get_page_args()
     pagination = (
         Class.query.filter_by(is_deleted=False)
         .join(Grade)

@@ -33,21 +33,5 @@
     {% endfor %}
   </tbody>
 </table>
-{% if pagination.pages > 1 %}
-<div class="pagination-wrapper">
-  <ul class="pagination pagination-sm">
-    {% for page_num in pagination.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
-      {% if page_num %}
-        {% if page_num == pagination.page %}
-        <li class="active"><span>{{ page_num }}</span></li>
-        {% else %}
-        <li><a href="{{ url_for('readers.manage_classes', page=page_num) }}">{{ page_num }}</a></li>
-        {% endif %}
-      {% else %}
-      <li class="disabled"><span>…</span></li>
-      {% endif %}
-    {% endfor %}
-  </ul>
-</div>
-{% endif %}
+{% include '_pagination.html' %}
 {% endblock %}

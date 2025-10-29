@@ -45,6 +45,7 @@ def _ensure_openpyxl() -> Tuple[Optional[WorkbookType], Optional[LoadWorkbookTyp
 from ..extensions import db
 from ..models import Book, Category
 from ..utils.category_tree import build_category_tree, flatten_category_tree
+from ..utils.pagination import get_page_args
 
 
 bp = Blueprint("books", __name__, url_prefix="/books")
@@ -64,8 +65,7 @@ def _category_options():
 @login_required
 def list_books():
     keyword = request.args.get("q", "").strip()
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = get_page_args()
     query = Book.query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"

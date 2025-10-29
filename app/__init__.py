@@ -5,6 +5,11 @@ from flask import Flask, request
 
 from .extensions import db, migrate, login_manager
 from .models import SystemSetting, User
+from .utils.pagination import (
+    PER_PAGE_OPTIONS,
+    build_pagination_links,
+    build_pagination_url,
+)
 
 
 NAV_SECTIONS = [
@@ -120,6 +125,14 @@ def create_app(test_config=None):
             "system_topbar_color": topbar_color,
             "system_nav_sections": nav_sections,
             "system_active_nav_key": _resolve_active_section(current_endpoint),
+        }
+
+    @app.context_processor
+    def inject_pagination_helpers():
+        return {
+            "pagination_per_page_options": PER_PAGE_OPTIONS,
+            "build_pagination_links": build_pagination_links,
+            "pagination_build_url": build_pagination_url,
         }
 
     return app

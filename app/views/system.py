@@ -8,6 +8,7 @@ from sqlalchemy.exc import OperationalError
 
 from ..extensions import db
 from ..models import SystemSetting, User
+from ..utils.pagination import get_page_args
 
 
 bp = Blueprint("system", __name__, url_prefix="/system")
@@ -25,8 +26,7 @@ def admin_required():
 def list_users():
     if not admin_required():
         return redirect(url_for("stats.dashboard"))
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = get_page_args()
     pagination = User.query.order_by(User.username).paginate(page=page, per_page=per_page, error_out=False)
     return render_template("system/users.html", users=pagination.items, pagination=pagination)
 
