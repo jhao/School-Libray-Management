@@ -37,19 +37,7 @@
   <div class="panel-body">
     <div class="row">
       <div class="col-sm-6">
-        <form method="post" action="{{ url_for('books.import_books') }}" enctype="multipart/form-data" class="form-inline import-form">
-          <div class="form-group">
-            <label class="sr-only" for="book-file">选择文件</label>
-            <input type="file" id="book-file" name="file" class="form-control input-sm" required>
-          </div>
-          <div class="checkbox">
-            <label>
-              <input type="checkbox" name="template_confirmed" value="1" required> 已下载模板并按要求填写
-            </label>
-          </div>
-          <button type="submit" class="btn btn-sm btn-info">导入Excel</button>
-        </form>
-        <a class="btn btn-link btn-xs" href="{{ url_for('books.download_import_template') }}">下载图书导入模板</a>
+        <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importBooksModal">导入Excel</button>
       </div>
       <div class="col-sm-6 text-right">
         <a class="btn btn-sm btn-success" href="{{ url_for('books.export_books') }}">导出Excel</a>
@@ -119,6 +107,35 @@
     </tbody>
   </table>
 </div>
-<div class="pagination-summary text-muted">共 {{ pagination.total }} 条记录</div>
+<div class="modal fade" id="importBooksModal" tabindex="-1" role="dialog" aria-labelledby="importBooksModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('books.import_books') }}" enctype="multipart/form-data">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h4 class="modal-title" id="importBooksModalLabel">导入图书</h4>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="book-file">选择文件</label>
+            <input type="file" id="book-file" name="file" class="form-control" required>
+          </div>
+          <div class="checkbox">
+            <label>
+              <input type="checkbox" name="template_confirmed" value="1" required> 已下载模板并按要求填写
+            </label>
+          </div>
+          <a class="btn btn-link" href="{{ url_for('books.download_import_template') }}">下载图书导入模板</a>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">确认导入</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">取消导入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% include '_pagination.html' %}
 {% endblock %}

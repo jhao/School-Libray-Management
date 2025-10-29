@@ -34,19 +34,14 @@
     </form>
   </div>
   <div class="panel-body">
-    <form method="post" action="{{ url_for('readers.import_readers') }}" enctype="multipart/form-data" class="form-inline import-form">
-      <div class="form-group">
-        <input type="file" name="file" class="form-control input-sm" required>
+    <div class="row">
+      <div class="col-sm-6">
+        <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importReadersModal">导入Excel</button>
       </div>
-      <div class="checkbox">
-        <label>
-          <input type="checkbox" name="template_confirmed" value="1" required> 已下载模板并按要求填写
-        </label>
+      <div class="col-sm-6 text-right">
+        <a class="btn btn-sm btn-success" href="{{ url_for('readers.export_readers') }}">导出Excel</a>
       </div>
-      <button type="submit" class="btn btn-sm btn-info">导入Excel</button>
-      <a class="btn btn-link btn-xs" href="{{ url_for('readers.download_reader_template') }}">下载读者导入模板</a>
-    </form>
-    <a class="btn btn-sm btn-success pull-right" href="{{ url_for('readers.export_readers') }}">导出Excel</a>
+    </div>
   </div>
   <form method="post" action="{{ url_for('readers.bulk_delete_readers') }}" id="bulk-delete-form" onsubmit="return confirm('确认删除选中的读者？');">
     <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -115,7 +110,36 @@
     </table>
   </form>
 </div>
-<div class="pagination-summary text-muted">共 {{ pagination.total }} 条记录</div>
+<div class="modal fade" id="importReadersModal" tabindex="-1" role="dialog" aria-labelledby="importReadersModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('readers.import_readers') }}" enctype="multipart/form-data">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h4 class="modal-title" id="importReadersModalLabel">导入读者</h4>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="reader-file">选择文件</label>
+            <input type="file" id="reader-file" name="file" class="form-control" required>
+          </div>
+          <div class="checkbox">
+            <label>
+              <input type="checkbox" name="template_confirmed" value="1" required> 已下载模板并按要求填写
+            </label>
+          </div>
+          <a class="btn btn-link" href="{{ url_for('readers.download_reader_template') }}">下载读者导入模板</a>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">确认导入</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">取消导入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% include '_pagination.html' %}
 {% endblock %}
 
