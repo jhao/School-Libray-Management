@@ -1,15 +1,46 @@
 import io
 from datetime import datetime
+from importlib import import_module
+from importlib.util import find_spec
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
 
-try:  # pragma: no cover - import guard is environment dependent
-    from openpyxl import Workbook, load_workbook
-    _HAS_OPENPYXL = True
-except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
-    Workbook = load_workbook = None  # type: ignore[assignment]
-    _HAS_OPENPYXL = False
+if TYPE_CHECKING:  # pragma: no cover - used solely for type checkers
+    from openpyxl import Workbook as WorkbookType
+    from openpyxl import load_workbook as LoadWorkbookType
+else:  # pragma: no cover - executed at runtime but simply provides aliases
+    WorkbookType = object
+    LoadWorkbookType = object
+
+_OPENPYXL_CACHE: Tuple[Optional[WorkbookType], Optional[LoadWorkbookType], bool]
+_OPENPYXL_CACHE = (None, None, False)
+
+
+def _ensure_openpyxl() -> Tuple[Optional[WorkbookType], Optional[LoadWorkbookType], bool]:
+    """Attempt to import openpyxl lazily.
+
+    Returns the Workbook class, load_workbook callable and a boolean indicating
+    whether the dependency is available. The result is cached to avoid repeated
+    import attempts during a single request lifecycle.
+    """
+
+    global _OPENPYXL_CACHE
+    workbook_cls, load_workbook_fn, has_attempted = _OPENPYXL_CACHE
+    if has_attempted:
+        return workbook_cls, load_workbook_fn, workbook_cls is not None and load_workbook_fn is not None
+
+    if find_spec("openpyxl") is None:  # pragma: no cover - optional dependency may be absent
+        _OPENPYXL_CACHE = (None, None, True)
+        return None, None, False
+
+    module = import_module("openpyxl")
+
+    workbook_cls = getattr(module, "Workbook", None)
+    load_workbook_fn = getattr(module, "load_workbook", None)
+    _OPENPYXL_CACHE = (workbook_cls, load_workbook_fn, True)
+    return workbook_cls, load_workbook_fn, workbook_cls is not None and load_workbook_fn is not None
 
 from ..extensions import db
 from ..models import Book, Category
@@ -108,7 +139,8 @@ def delete_book(book_id: int):
 @bp.route("/import", methods=["POST"])
 @login_required
 def import_books():
-    if not _HAS_OPENPYXL:
+    _, load_workbook_fn, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or load_workbook_fn is None:
         flash("未安装 openpyxl 库，无法导入。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("books.list_books"))
 
@@ -118,7 +150,7 @@ def import_books():
         return redirect(url_for("books.list_books"))
 
     try:
-        wb = load_workbook(file, data_only=True)
+        wb = load_workbook_fn(file, data_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         count = 0
@@ -152,11 +184,12 @@ def import_books():
 @bp.route("/export")
 @login_required
 def export_books():
-    if not _HAS_OPENPYXL:
+    workbook_cls, _, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or workbook_cls is None:
         flash("未安装 openpyxl 库，无法导出。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("books.list_books"))
 
-    wb = Workbook()
+    wb = workbook_cls()
     ws = wb.active
     ws.append([
         "图书名称",

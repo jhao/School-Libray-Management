@@ -1,14 +1,41 @@
 import io
 from datetime import datetime
+from importlib import import_module
+from importlib.util import find_spec
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
 
-try:
-    from openpyxl import Workbook, load_workbook
-except ImportError:  # pragma: no cover - environment dependent optional dependency
-    Workbook = None
-    load_workbook = None
+if TYPE_CHECKING:  # pragma: no cover - assists static analysis only
+    from openpyxl import Workbook as WorkbookType
+    from openpyxl import load_workbook as LoadWorkbookType
+else:  # pragma: no cover - runtime alias without importing optional dependency
+    WorkbookType = object
+    LoadWorkbookType = object
+
+_OPENPYXL_CACHE: Tuple[Optional[WorkbookType], Optional[LoadWorkbookType], bool]
+_OPENPYXL_CACHE = (None, None, False)
+
+
+def _ensure_openpyxl() -> Tuple[Optional[WorkbookType], Optional[LoadWorkbookType], bool]:
+    """Lazily import openpyxl, returning its key entry points when available."""
+
+    global _OPENPYXL_CACHE
+    workbook_cls, load_workbook_fn, has_attempted = _OPENPYXL_CACHE
+    if has_attempted:
+        return workbook_cls, load_workbook_fn, workbook_cls is not None and load_workbook_fn is not None
+
+    if find_spec("openpyxl") is None:  # pragma: no cover - optional dependency may be absent
+        _OPENPYXL_CACHE = (None, None, True)
+        return None, None, False
+
+    module = import_module("openpyxl")
+
+    workbook_cls = getattr(module, "Workbook", None)
+    load_workbook_fn = getattr(module, "load_workbook", None)
+    _OPENPYXL_CACHE = (workbook_cls, load_workbook_fn, True)
+    return workbook_cls, load_workbook_fn, workbook_cls is not None and load_workbook_fn is not None
 
 from ..extensions import db
 from ..models import Class, Grade, Reader
@@ -98,12 +125,13 @@ def import_readers():
         flash("请选择Excel文件", "danger")
         return redirect(url_for("readers.list_readers"))
 
-    if load_workbook is None:
+    _, load_workbook_fn, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or load_workbook_fn is None:
         flash("当前环境缺少 openpyxl 依赖，无法导入读者数据。", "danger")
         return redirect(url_for("readers.list_readers"))
 
     try:
-        wb = load_workbook(file, data_only=True)
+        wb = load_workbook_fn(file, data_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         count = 0
@@ -133,11 +161,12 @@ def import_readers():
 @bp.route("/export")
 @login_required
 def export_readers():
-    if Workbook is None:
+    workbook_cls, _, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or workbook_cls is None:
         flash("当前环境缺少 openpyxl 依赖，无法导出读者数据。", "danger")
         return redirect(url_for("readers.list_readers"))
 
-    wb = Workbook()
+    wb = workbook_cls()
     ws = wb.active
     ws.append(["卡号", "姓名", "电话", "性别", "班级"])
     for reader in Reader.query.filter_by(is_deleted=False).order_by(Reader.name).all():
