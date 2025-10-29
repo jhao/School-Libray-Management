@@ -113,8 +113,16 @@
   </div>
   <div class="col-md-5">
     <div class="panel panel-default">
-      <div class="panel-heading">
-        <strong>生成记录</strong>
+      <div class="panel-heading clearfix">
+        <strong class="pull-left">生成记录</strong>
+        <form
+          class="pull-right"
+          method="post"
+          action="{{ url_for('system.delete_all_test_data_batches') }}"
+          onsubmit="return confirm('确认删除所有由超级管理员生成的测试数据？');"
+        >
+          <button type="submit" class="btn btn-xs btn-danger">删除测试数据</button>
+        </form>
       </div>
       <div class="panel-body">
         {% if batches %}
@@ -124,7 +132,6 @@
               <th>时间</th>
               <th>范围</th>
               <th>数量</th>
-              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -144,11 +151,6 @@
               <td>
                 {{ batch.record_count }}<br>
                 <small>归还比例：{{ '%.0f' % (batch.return_rate * 100) }}%</small>
-              </td>
-              <td>
-                <form method="post" action="{{ url_for('system.delete_test_data_batch', batch_id=batch.id) }}" onsubmit="return confirm('确认删除所有由超级管理员生成的测试数据？');">
-                  <button type="submit" class="btn btn-xs btn-danger">删除测试数据</button>
-                </form>
               </td>
             </tr>
             {% endfor %}
