@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy.orm import selectinload
 
 from ..extensions import db
@@ -48,6 +48,7 @@ def borrow():
             reader=reader,
             amount=amount,
             due_date=datetime.utcnow() + timedelta(days=due_days),
+            borrow_operator=current_user,
         )
         book.lend_amount += amount
         db.session.add(lend)
@@ -57,6 +58,12 @@ def borrow():
 
     lends = (
         Lend.query.filter_by(is_deleted=False)
+        .options(
+            selectinload(Lend.reader),
+            selectinload(Lend.book),
+            selectinload(Lend.borrow_operator),
+            selectinload(Lend.return_operator),
+        )
         .order_by(Lend.created_at.desc())
         .limit(20)
         .all()
@@ -90,15 +97,28 @@ def return_book():
             flash("未找到借阅记录", "danger")
             return redirect(url_for("lending.return_book"))
 
-        return_record = ReturnRecord(lend=lend, amount=amount)
+        return_record = ReturnRecord(lend=lend, amount=amount, operator=current_user)
         lend.mark_returned()
+        lend.return_operator = current_user
         book.lend_amount = max(book.lend_amount - amount, 0)
         db.session.add(return_record)
         db.session.commit()
         flash("归还成功", "success")
         return redirect(url_for("lending.return_book"))
 
-    returns = ReturnRecord.query.order_by(ReturnRecord.created_at.desc()).limit(20).all()
+    returns = (
+        ReturnRecord.query.options(
+            selectinload(ReturnRecord.lend)
+            .selectinload(Lend.reader)
+            .selectinload(Reader.reader_class)
+            .selectinload(Class.grade),
+            selectinload(ReturnRecord.lend).selectinload(Lend.book),
+            selectinload(ReturnRecord.operator),
+        )
+        .order_by(ReturnRecord.created_at.desc())
+        .limit(20)
+        .all()
+    )
     return render_template("lending/return.html", returns=returns)
 
 
@@ -130,6 +150,11 @@ def records():
         .outerjoin(Class, Reader.reader_class)
         .outerjoin(Grade, Class.grade)
         .filter(Lend.is_deleted.is_(False))
+        .options(
+            selectinload(Lend.borrow_operator),
+            selectinload(Lend.return_operator),
+            selectinload(Lend.returns),
+        )
     )
 
     if card_no:
@@ -200,6 +225,7 @@ def records():
         grades=grades,
         classes=classes,
         filters=filters,
+        current_time=datetime.utcnow(),
     )
 
 
@@ -215,8 +241,9 @@ def return_from_record(lend_id: int):
         next_url = request.form.get("next")
         return redirect(next_url or url_for("lending.records"))
 
-    return_record = ReturnRecord(lend=lend, amount=lend.amount)
+    return_record = ReturnRecord(lend=lend, amount=lend.amount, operator=current_user)
     lend.mark_returned()
+    lend.return_operator = current_user
     if lend.book:
         lend.book.lend_amount = max(lend.book.lend_amount - lend.amount, 0)
     db.session.add(return_record)

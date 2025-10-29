@@ -119,9 +119,13 @@ class Lend(SoftDeleteMixin, TimestampMixin, db.Model):
     due_date = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(32), default="lent")
     comment = db.Column(db.Text)
+    borrow_operator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    return_operator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
     book = db.relationship("Book", backref="lends")
     reader = db.relationship("Reader", backref="lends")
+    borrow_operator = db.relationship("User", foreign_keys=[borrow_operator_id])
+    return_operator = db.relationship("User", foreign_keys=[return_operator_id])
 
     def mark_returned(self) -> None:
         self.status = "returned"
@@ -135,8 +139,10 @@ class ReturnRecord(SoftDeleteMixin, TimestampMixin, db.Model):
     lend_id = db.Column(db.Integer, db.ForeignKey("lends.id"), nullable=False)
     amount = db.Column(db.Integer, default=1)
     comment = db.Column(db.Text)
+    operator_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
     lend = db.relationship("Lend", backref="returns")
+    operator = db.relationship("User", foreign_keys=[operator_id])
 
 
 class SystemSetting(TimestampMixin, db.Model):

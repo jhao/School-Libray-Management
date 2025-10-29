@@ -34,6 +34,7 @@
           <th>图书</th>
           <th>数量</th>
           <th>应还日期</th>
+          <th>借出操作人</th>
           <th>状态</th>
         </tr>
       </thead>
@@ -45,6 +46,7 @@
           <td>{{ lend.book.name }} ({{ lend.book.isbn }})</td>
           <td>{{ lend.amount }}</td>
           <td>{{ lend.due_date.strftime('%Y-%m-%d') }}</td>
+          <td>{{ lend.borrow_operator.username if lend.borrow_operator else '—' }}</td>
           <td>{{ '已归还' if lend.status == 'returned' else '借出中' }}</td>
         </tr>
         {% endfor %}

@@ -69,7 +69,7 @@
           <td>{{ reader.reader_class.name if reader.reader_class else '' }}</td>
           <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
           <td>
-            <button class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
+            <button type="button" class="btn btn-xs btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">编辑</button>
             <form method="post" action="{{ url_for('readers.delete_reader', reader_id=reader.id) }}" style="display:inline" onsubmit="return confirm('确认删除?');">
               <button type="submit" class="btn btn-xs btn-danger">删除</button>
             </form>
