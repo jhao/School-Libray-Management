@@ -10,12 +10,14 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
 
     default_sqlite_path = Path(app.instance_path) / "library.sqlite"
+
+    database_uri = os.environ.get("DATABASE_URI", "")
+    if not database_uri.strip():
+        database_uri = f"sqlite:///{default_sqlite_path}"
+
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
-        SQLALCHEMY_DATABASE_URI=os.environ.get(
-            "DATABASE_URI",
-            f"sqlite:///{default_sqlite_path}",
-        ),
+        SQLALCHEMY_DATABASE_URI=database_uri,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
