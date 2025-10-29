@@ -97,6 +97,7 @@
             <input type="number" name="lend_amount" value="{{ book.lend_amount }}" class="form-control input-sm" style="width:100px" min="0">
             <input type="text" name="position" value="{{ book.position }}" class="form-control input-sm" placeholder="位置">
             <button type="submit" class="btn btn-sm btn-primary">保存</button>
+            <button type="button" class="btn btn-sm btn-default" data-toggle="collapse" data-target="#edit-{{ book.id }}">取消</button>
           </form>
         </td>
       </tr>

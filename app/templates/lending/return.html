@@ -4,7 +4,7 @@
 <div class="row">
   <div class="col-sm-4 col-md-3">
     <h4>归还操作</h4>
-    <form method="post">
+    <form method="post" id="return-form">
       <div class="form-group">
         <label>读者卡号</label>
         <input type="text" name="card_no" class="form-control" required>
@@ -46,4 +46,27 @@
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('return-form');
+    if (!form) {
+      return;
+    }
+    var isbnInput = form.querySelector('input[name="isbn"]');
+    var submitButton = form.querySelector('button[type="submit"]');
+    if (!isbnInput || !submitButton) {
+      return;
+    }
+    isbnInput.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitButton.focus();
+      }
+    });
+  });
+</script>
 {% endblock %}
