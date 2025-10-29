@@ -1,20 +1,26 @@
 import os
+from pathlib import Path
+
 from flask import Flask
 
 from .extensions import db, migrate, login_manager
 from .models import User
 
 def create_app(test_config=None):
-    app = Flask(__name__)
+    app = Flask(__name__, instance_relative_config=True)
 
+    default_sqlite_path = Path(app.instance_path) / "library.sqlite"
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
         SQLALCHEMY_DATABASE_URI=os.environ.get(
             "DATABASE_URI",
-            "mysql+pymysql://library:library@db/library",
+            f"sqlite:///{default_sqlite_path}",
         ),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
+
+    # Ensure the instance folder exists so SQLite can create the database file.
+    default_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
 
     if test_config:
         app.config.update(test_config)

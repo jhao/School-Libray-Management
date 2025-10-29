@@ -1,6 +1,6 @@
 # School-Library-Management
 
-基于 Flask + MySQL 8 的学校图书馆管理系统，支持 Docker 一键部署。系统提供图书、分类、读者、借阅归还、统计分析以及系统用户管理等功能，前后端同域运行，支持 PC 端与移动端的响应式访问。
+基于 Flask 的学校图书馆管理系统，支持 Docker 一键部署。系统提供图书、分类、读者、借阅归还、统计分析以及系统用户管理等功能，前后端同域运行，支持 PC 端与移动端的响应式访问。默认使用 SQLite 数据库，亦可连接 MySQL 8。 
 
 ## 功能概览
 
@@ -18,7 +18,7 @@
 ### 环境要求
 
 - Python 3.11+
-- MySQL 8.0+
+- （可选）MySQL 8.0+
 
 ### 本地运行
 
@@ -30,7 +30,7 @@
    pip install -r requirements.txt
    ```
 
-2. 设置数据库连接并初始化：
+2. （可选）如需使用 MySQL，请设置数据库连接并初始化：
 
    ```bash
    export DATABASE_URI="mysql+pymysql://library:library@localhost/library"
@@ -39,9 +39,13 @@
    flask --app wsgi seed
    ```
 
-3. 启动开发服务器：
+   如不设置 `DATABASE_URI`，系统将会在 `instance/library.sqlite` 中自动创建 SQLite 数据库文件。
+
+3. 初始化并启动开发服务器：
 
    ```bash
+   flask --app wsgi init-db
+   flask --app wsgi seed
    flask --app wsgi run --debug
    ```
 
