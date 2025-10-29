@@ -67,6 +67,7 @@ class Book(SoftDeleteMixin, TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     isbn = db.Column(db.String(32), unique=True, nullable=False)
+    call_number = db.Column(db.String(255))
     position = db.Column(db.String(255))
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
     category = db.relationship("Category", backref="books")

@@ -43,6 +43,7 @@
       <tr>
         <th>名称</th>
         <th>ISBN</th>
+        <th>索书码</th>
         <th>分类</th>
         <th>库存</th>
         <th>已借出</th>
@@ -55,6 +56,7 @@
       <tr>
         <td>{{ book.name }}</td>
         <td>{{ book.isbn }}</td>
+        <td>{{ book.call_number or '-' }}</td>
         <td>{{ book.category.name if book.category else '未分类' }}</td>
         <td>{{ book.amount }}</td>
         <td>{{ book.lend_amount }}</td>
@@ -67,11 +69,21 @@
         </td>
       </tr>
       <tr id="edit-{{ book.id }}" class="collapse">
-        <td colspan="7">
-          <form method="post" action="{{ url_for('books.update_book', book_id=book.id) }}" class="form-inline">
-            <input type="text" name="name" value="{{ book.name }}" class="form-control input-sm" placeholder="名称">
-            <input type="text" name="isbn" value="{{ book.isbn }}" class="form-control input-sm" placeholder="ISBN">
-            <input type="number" name="amount" value="{{ book.amount }}" class="form-control input-sm" style="width:100px" min="0">
+        <td colspan="8">
+          <form method="post" action="{{ url_for('books.update_book', book_id=book.id) }}" class="form-inline book-inline-form">
+            <input type="text" name="name" value="{{ book.name }}" class="form-control input-sm" placeholder="名称" required>
+            <input type="text" name="isbn" value="{{ book.isbn }}" class="form-control input-sm" placeholder="ISBN" required>
+            <input type="text" name="call_number" value="{{ book.call_number }}" class="form-control input-sm" placeholder="索书码">
+            <select name="category_id" class="form-control input-sm">
+              <option value="">未分类</option>
+              {% for item in category_options %}
+              {% set option = item.category %}
+              {% set indent = '&nbsp;&nbsp;&nbsp;&nbsp;' * item.depth %}
+              {% set prefix = '└ ' if item.depth > 0 else '' %}
+              <option value="{{ option.id }}" {% if book.category_id == option.id %}selected{% endif %}>{{ indent|safe }}{{ prefix }}{{ option.name }}</option>
+              {% endfor %}
+            </select>
+            <input type="number" name="amount" value="{{ book.amount }}" class="form-control input-sm" style="width:100px" min="1" required>
             <input type="number" name="lend_amount" value="{{ book.lend_amount }}" class="form-control input-sm" style="width:100px" min="0">
             <input type="text" name="position" value="{{ book.position }}" class="form-control input-sm" placeholder="位置">
             <button type="submit" class="btn btn-sm btn-primary">保存</button>
@@ -80,7 +92,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="7" class="text-center text-muted">暂无数据</td>
+        <td colspan="8" class="text-center text-muted">暂无数据</td>
       </tr>
       {% endfor %}
     </tbody>
