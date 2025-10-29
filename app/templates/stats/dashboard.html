@@ -172,8 +172,8 @@
       var book = popularBooks[i];
       rows.push('<tr>' +
         '<td>' + (i + 1) + '</td>' +
-        '<td>' + (book[0] || '') + '</td>' +
-        '<td>' + (book[1] || 0) + '</td>' +
+        '<td>' + (book.name || '') + '</td>' +
+        '<td>' + (book.total || 0) + '</td>' +
         '</tr>');
     }
     popularBody.innerHTML = rows.join('');
