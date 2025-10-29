@@ -11,17 +11,27 @@ bp = Blueprint("categories", __name__, url_prefix="/categories")
 @bp.route("/")
 @login_required
 def list_categories():
-    categories = Category.query.filter_by(is_deleted=False).order_by(Category.sort, Category.name).all()
-    return render_template("categories/list.html", categories=categories)
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    pagination = (
+        Category.query.filter_by(is_deleted=False)
+        .order_by(Category.sort, Category.name)
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+    return render_template("categories/list.html", categories=pagination.items, pagination=pagination)
 
 
-@bp.route("/create", methods=["POST"])
+@bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_category():
+    categories = Category.query.filter_by(is_deleted=False).order_by(Category.name).all()
+    if request.method == "GET":
+        return render_template("categories/create.html", categories=categories)
+
     name = request.form.get("name", "").strip()
     if not name:
         flash("分类名称不能为空", "danger")
-        return redirect(url_for("categories.list_categories"))
+        return redirect(url_for("categories.create_category"))
     category = Category(
         name=name,
         parent_id=request.form.get("parent_id") or None,

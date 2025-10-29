@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}系统外观设置{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>系统外观设置</h2>
+</div>
+<form method="post" action="{{ url_for('system.system_settings') }}" enctype="multipart/form-data" class="form-horizontal">
+  <div class="form-group">
+    <label class="col-sm-2 control-label">系统Logo</label>
+    <div class="col-sm-6">
+      {% if logo_path %}
+      <div class="current-logo">
+        <img src="{{ url_for('static', filename=logo_path) }}" alt="当前Logo" class="img-thumbnail" style="max-height: 80px;">
+      </div>
+      {% endif %}
+      <input type="file" name="logo" class="form-control">
+      {% if logo_path %}
+      <div class="checkbox" style="margin-top:8px;">
+        <label><input type="checkbox" name="remove_logo" value="1"> 移除当前Logo</label>
+      </div>
+      {% endif %}
+      <p class="help-block">建议上传透明背景的 PNG 图片。</p>
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="col-sm-2 control-label">Topbar颜色</label>
+    <div class="col-sm-3">
+      <input type="color" name="topbar_color" class="form-control" value="{{ topbar_color }}">
+    </div>
+  </div>
+  <div class="form-group">
+    <div class="col-sm-offset-2 col-sm-6">
+      <button type="submit" class="btn btn-primary">保存设置</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
