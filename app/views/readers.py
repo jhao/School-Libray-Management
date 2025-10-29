@@ -3,7 +3,12 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
-from openpyxl import Workbook, load_workbook
+
+try:
+    from openpyxl import Workbook, load_workbook
+except ImportError:  # pragma: no cover - environment dependent optional dependency
+    Workbook = None
+    load_workbook = None
 
 from ..extensions import db
 from ..models import Class, Grade, Reader
@@ -93,6 +98,10 @@ def import_readers():
         flash("请选择Excel文件", "danger")
         return redirect(url_for("readers.list_readers"))
 
+    if load_workbook is None:
+        flash("当前环境缺少 openpyxl 依赖，无法导入读者数据。", "danger")
+        return redirect(url_for("readers.list_readers"))
+
     try:
         wb = load_workbook(file, data_only=True)
         ws = wb.active
@@ -124,6 +133,10 @@ def import_readers():
 @bp.route("/export")
 @login_required
 def export_readers():
+    if Workbook is None:
+        flash("当前环境缺少 openpyxl 依赖，无法导出读者数据。", "danger")
+        return redirect(url_for("readers.list_readers"))
+
     wb = Workbook()
     ws = wb.active
     ws.append(["卡号", "姓名", "电话", "性别", "班级"])
