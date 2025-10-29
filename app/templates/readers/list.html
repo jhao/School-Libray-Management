@@ -38,6 +38,7 @@
         <th>姓名</th>
         <th>电话</th>
         <th>性别</th>
+        <th>年级</th>
         <th>班级</th>
         <th>状态</th>
         <th>操作</th>
@@ -50,6 +51,7 @@
         <td>{{ reader.name }}</td>
         <td>{{ reader.phone }}</td>
         <td>{{ reader.sex }}</td>
+        <td>{{ reader.reader_class.grade.name if reader.reader_class and reader.reader_class.grade else '' }}</td>
         <td>{{ reader.reader_class.name if reader.reader_class else '' }}</td>
         <td>{{ '正常' if reader.status == 'active' else reader.status }}</td>
         <td>
@@ -60,7 +62,7 @@
         </td>
       </tr>
       <tr id="reader-{{ reader.id }}" class="collapse">
-        <td colspan="6">
+        <td colspan="8">
           <form method="post" action="{{ url_for('readers.update_reader', reader_id=reader.id) }}" class="form-inline">
             <input type="text" name="card_no" value="{{ reader.card_no }}" class="form-control input-sm" placeholder="卡号">
             <input type="text" name="name" value="{{ reader.name }}" class="form-control input-sm" placeholder="姓名">
@@ -82,7 +84,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" class="text-center text-muted">暂无数据</td>
+        <td colspan="8" class="text-center text-muted">暂无数据</td>
       </tr>
       {% endfor %}
     </tbody>

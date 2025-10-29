@@ -2,7 +2,7 @@ import io
 from datetime import datetime
 from importlib import import_module
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
@@ -55,7 +55,13 @@ def list_readers():
         like = f"%{keyword}%"
         query = query.filter((Reader.name.like(like)) | (Reader.card_no.like(like)))
     pagination = query.order_by(Reader.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-    classes = Class.query.filter_by(is_deleted=False).order_by(Class.name).all()
+    classes = (
+        Class.query.filter_by(is_deleted=False)
+        .join(Grade)
+        .filter(Grade.is_deleted.is_(False))
+        .order_by(Grade.name, Class.name)
+        .all()
+    )
     return render_template(
         "readers/list.html",
         readers=pagination.items,
@@ -68,7 +74,13 @@ def list_readers():
 @bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_reader():
-    classes = Class.query.filter_by(is_deleted=False).order_by(Class.name).all()
+    classes = (
+        Class.query.filter_by(is_deleted=False)
+        .join(Grade)
+        .filter(Grade.is_deleted.is_(False))
+        .order_by(Grade.name, Class.name)
+        .all()
+    )
 
     if request.method == "GET":
         return render_template("readers/create.html", classes=classes)
@@ -148,14 +160,36 @@ def import_readers():
         for row in rows:
             if not row:
                 continue
-            card_no = str(row[0]).strip() if row[0] else None
+            card_no = str(row[0]).strip() if len(row) > 0 and row[0] else None
             if not card_no or Reader.query.filter_by(card_no=card_no).first():
                 continue
+
+            grade_name = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+            class_name = str(row[5]).strip() if len(row) > 5 and row[5] else ""
+            klass = None
+            if class_name:
+                class_query = Class.query.filter_by(name=class_name, is_deleted=False)
+                if grade_name:
+                    grade = Grade.query.filter_by(name=grade_name, is_deleted=False).first()
+                    if grade:
+                        klass = class_query.filter_by(grade_id=grade.id).first()
+                if klass is None:
+                    klass = class_query.join(Grade).filter(Grade.is_deleted.is_(False)).first()
+            elif grade_name:
+                grade = Grade.query.filter_by(name=grade_name, is_deleted=False).first()
+                if grade:
+                    klass = (
+                        Class.query.filter_by(is_deleted=False, grade_id=grade.id)
+                        .order_by(Class.name)
+                        .first()
+                    )
+
             reader = Reader(
                 card_no=card_no,
-                name=row[1] or "未命名读者",
-                phone=row[2],
-                sex=row[3],
+                name=(row[1] or "未命名读者") if len(row) > 1 else "未命名读者",
+                phone=row[2] if len(row) > 2 else None,
+                sex=row[3] if len(row) > 3 else None,
+                class_id=klass.id if klass else None,
             )
             db.session.add(reader)
             count += 1
@@ -178,7 +212,65 @@ def download_reader_template():
 
     wb = workbook_cls()
     ws = wb.active
-    ws.append(["卡号", "姓名", "电话", "性别"])
+    ws.title = "读者信息"
+    ws.append(["卡号", "姓名", "电话", "性别", "年级", "班级"])
+
+    grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
+    classes = (
+        Class.query.filter_by(is_deleted=False)
+        .join(Grade)
+        .filter(Grade.is_deleted.is_(False))
+        .order_by(Grade.name, Class.name)
+        .all()
+    )
+
+    data_sheet = wb.create_sheet("年级班级信息")
+    data_sheet.append(["年级", "班级"])
+    for idx, grade in enumerate(grades, start=2):
+        data_sheet.cell(row=idx, column=1, value=grade.name)
+    for idx, klass in enumerate(classes, start=2):
+        grade_name = klass.grade.name if klass.grade else ""
+        display_name = f"{grade_name}{klass.name}" if grade_name else klass.name
+        data_sheet.cell(row=idx, column=2, value=display_name)
+    data_sheet.sheet_state = "hidden"
+
+    try:
+        dv_module = import_module("openpyxl.worksheet.datavalidation")
+        DataValidation = getattr(dv_module, "DataValidation", None)
+        utils_module = import_module("openpyxl.utils")
+        get_column_letter = getattr(utils_module, "get_column_letter", None)
+        quote_sheetname_fn = getattr(utils_module, "quote_sheetname", None)
+    except Exception:  # noqa: BLE001 - fallback when openpyxl structure changes
+        DataValidation = None
+        get_column_letter = None
+        quote_sheetname_fn = None
+
+    def _quote_sheet_name(name: str) -> str:
+        if quote_sheetname_fn:
+            return quote_sheetname_fn(name)
+        escaped = name.replace("'", "''")
+        return f"'{escaped}'"
+
+    if DataValidation and get_column_letter:
+        max_rows = 500
+        grade_column = get_column_letter(5)
+        class_column = get_column_letter(6)
+        if grades:
+            grade_list_ref = f"={_quote_sheet_name(data_sheet.title)}!$A$2:$A${len(grades) + 1}"
+            grade_range = f"{grade_column}2:{grade_column}{max_rows}"
+            grade_validation = DataValidation(type="list", formula1=grade_list_ref, allow_blank=True)
+            grade_validation.error = "请选择下拉列表中的年级"
+            grade_validation.errorTitle = "无效的年级"
+            ws.add_data_validation(grade_validation)
+            grade_validation.add(grade_range)
+        if classes:
+            class_list_ref = f"={_quote_sheet_name(data_sheet.title)}!$B$2:$B${len(classes) + 1}"
+            class_range = f"{class_column}2:{class_column}{max_rows}"
+            class_validation = DataValidation(type="list", formula1=class_list_ref, allow_blank=True)
+            class_validation.error = "请选择下拉列表中的班级"
+            class_validation.errorTitle = "无效的班级"
+            ws.add_data_validation(class_validation)
+            class_validation.add(class_range)
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
@@ -200,7 +292,7 @@ def export_readers():
 
     wb = workbook_cls()
     ws = wb.active
-    ws.append(["卡号", "姓名", "电话", "性别", "班级"])
+    ws.append(["卡号", "姓名", "电话", "性别", "年级", "班级"])
     for reader in Reader.query.filter_by(is_deleted=False).order_by(Reader.name).all():
         ws.append(
             [
@@ -208,6 +300,7 @@ def export_readers():
                 reader.name,
                 reader.phone,
                 reader.sex,
+                reader.reader_class.grade.name if reader.reader_class and reader.reader_class.grade else "",
                 reader.reader_class.name if reader.reader_class else "",
             ]
         )
@@ -268,7 +361,9 @@ def manage_classes():
     per_page = request.args.get("per_page", 20, type=int)
     pagination = (
         Class.query.filter_by(is_deleted=False)
-        .order_by(Class.name)
+        .join(Grade)
+        .filter(Grade.is_deleted.is_(False))
+        .order_by(Grade.name, Class.name)
         .paginate(page=page, per_page=per_page, error_out=False)
     )
     grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
@@ -287,15 +382,50 @@ def create_class():
     if request.method == "GET":
         return render_template("readers/classes_create.html", grades=grades)
 
-    name = request.form.get("name", "").strip()
-    grade_id = request.form.get("grade_id")
-    if not name or not grade_id:
-        flash("班级名称与所属年级不能为空", "danger")
+    grade_id_raw = request.form.get("grade_id")
+    names_raw = request.form.get("names", "")
+    if not grade_id_raw or not names_raw.strip():
+        flash("请选择年级并输入至少一个班级名称", "danger")
         return redirect(url_for("readers.create_class"))
-    klass = Class(name=name, grade_id=int(grade_id))
-    db.session.add(klass)
+
+    try:
+        grade_id = int(grade_id_raw)
+    except ValueError:
+        flash("年级选择无效", "danger")
+        return redirect(url_for("readers.create_class"))
+
+    grade = Grade.query.filter_by(id=grade_id, is_deleted=False).first()
+    if grade is None:
+        flash("年级不存在或已被删除", "danger")
+        return redirect(url_for("readers.create_class"))
+
+    names = [name.strip() for name in names_raw.replace("\r", "").split("\n")]
+    names = [name for name in names if name]
+    if not names:
+        flash("请输入至少一个有效的班级名称", "danger")
+        return redirect(url_for("readers.create_class"))
+
+    created_count = 0
+    skipped: List[str] = []
+    for name in names:
+        exists = Class.query.filter_by(name=name, grade_id=grade.id, is_deleted=False).first()
+        if exists:
+            skipped.append(name)
+            continue
+        klass = Class(name=name, grade_id=grade.id)
+        db.session.add(klass)
+        created_count += 1
+
+    if created_count == 0:
+        db.session.rollback()
+        flash("没有新增班级，可能全部已存在。", "warning")
+        return redirect(url_for("readers.create_class"))
+
     db.session.commit()
-    flash("班级创建成功", "success")
+    message = f"成功创建 {created_count} 个班级"
+    if skipped:
+        message += f"，以下名称已存在并被跳过：{', '.join(skipped)}"
+    flash(message, "success" if created_count else "warning")
     return redirect(url_for("readers.manage_classes"))
 
 
