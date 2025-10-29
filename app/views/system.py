@@ -1,12 +1,15 @@
+import json
 import os
+import random
 import shutil
-from datetime import datetime
-from typing import List, Optional
+from datetime import date, datetime, timedelta
+from typing import List, Optional, Set
 
 from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -17,10 +20,21 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.engine.url import make_url
+from sqlalchemy.sql import func
 
 from ..constants import DEFAULT_BRAND_COLOR
 from ..extensions import db
-from ..models import SystemSetting, User
+from ..models import (
+    Book,
+    Class,
+    Grade,
+    Lend,
+    Reader,
+    ReturnRecord,
+    SystemSetting,
+    TestDataBatch,
+    User,
+)
 from ..utils.pagination import get_page_args
 
 
@@ -32,6 +46,112 @@ def admin_required():
         flash("只有管理员可以执行此操作", "danger")
         return False
     return True
+
+
+def _ensure_super_admin() -> User:
+    user = User.query.filter_by(username="超级管理员").first()
+    if user:
+        if user.level != "admin":
+            user.level = "admin"
+            db.session.commit()
+        return user
+    user = User(username="超级管理员", level="admin")
+    user.set_password("testdata123")
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+def _parse_date(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _pick_random_datetime(
+    start_day: date,
+    end_day: date,
+    excluded: Set[str],
+    min_datetime: Optional[datetime] = None,
+) -> Optional[datetime]:
+    if start_day > end_day:
+        return None
+    days: List[date] = []
+    cursor = start_day
+    while cursor <= end_day:
+        if cursor.strftime("%Y-%m-%d") not in excluded:
+            days.append(cursor)
+        cursor += timedelta(days=1)
+    if not days:
+        return None
+    chosen_day = random.choice(days)
+    day_start = datetime.combine(chosen_day, datetime.min.time())
+    day_end = day_start + timedelta(days=1, seconds=-1)
+    lower_bound = day_start
+    if min_datetime and chosen_day == min_datetime.date():
+        lower_bound = max(lower_bound, min_datetime)
+    if lower_bound > day_end:
+        return lower_bound
+    span = int((day_end - lower_bound).total_seconds())
+    offset = random.randint(0, span if span > 0 else 0)
+    return lower_bound + timedelta(seconds=offset)
+
+
+def _build_grade_tree() -> List[dict]:
+    grades = (
+        Grade.query.filter_by(is_deleted=False)
+        .order_by(Grade.name)
+        .all()
+    )
+    tree: List[dict] = []
+    for grade in grades:
+        classes = [
+            {"id": klass.id, "name": klass.name}
+            for klass in sorted(grade.classes, key=lambda c: c.name)
+            if not klass.is_deleted
+        ]
+        tree.append({"id": grade.id, "name": grade.name, "classes": classes})
+    return tree
+
+
+def _normalize_id_list(values: Optional[List]) -> List[int]:
+    result: List[int] = []
+    if not values:
+        return result
+    for value in values:
+        try:
+            result.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _delete_super_admin_data(super_admin: User) -> int:
+    deleted_count = 0
+    returns = ReturnRecord.query.filter(
+        ReturnRecord.operator_id == super_admin.id
+    ).all()
+    for record in returns:
+        db.session.delete(record)
+        deleted_count += 1
+
+    lends = (
+        Lend.query.filter(
+            (Lend.borrow_operator_id == super_admin.id)
+            | (Lend.return_operator_id == super_admin.id)
+        )
+        .all()
+    )
+    for lend in lends:
+        if lend.status != "returned" and lend.book:
+            lend.book.lend_amount = max(lend.book.lend_amount - lend.amount, 0)
+        db.session.delete(lend)
+        deleted_count += 1
+    db.session.commit()
+    return deleted_count
 
 
 @bp.route("/users")
@@ -178,6 +298,194 @@ def system_settings():
         logo_path=current_logo,
         default_topbar_color=DEFAULT_BRAND_COLOR,
     )
+
+
+@bp.route("/test-data")
+@login_required
+def test_data():
+    if not admin_required():
+        return redirect(url_for("stats.dashboard"))
+
+    grade_tree = _build_grade_tree()
+    batches_query = (
+        TestDataBatch.query.order_by(TestDataBatch.created_at.desc()).all()
+    )
+    batches = []
+    for batch in batches_query:
+        batches.append(
+            {
+                "id": batch.id,
+                "created_at": batch.created_at,
+                "start_date": batch.start_date,
+                "end_date": batch.end_date,
+                "record_count": batch.record_count,
+                "excluded_dates": json.loads(batch.excluded_dates or "[]"),
+                "grade_ids": json.loads(batch.grade_ids or "[]"),
+                "class_ids": json.loads(batch.class_ids or "[]"),
+                "return_rate": float(batch.return_rate or 0),
+                "triggered_by": batch.triggered_by.username if batch.triggered_by else "",
+            }
+        )
+
+    return render_template(
+        "system/test_data.html",
+        grade_tree=grade_tree,
+        batches=batches,
+        default_return_rate=0.7,
+    )
+
+
+@bp.route("/test-data/execute", methods=["POST"])
+@login_required
+def execute_test_data():
+    if not admin_required():
+        return jsonify({"success": False, "message": "权限不足"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    start_day = _parse_date(payload.get("start_date"))
+    end_day = _parse_date(payload.get("end_date"))
+    if not start_day or not end_day or start_day > end_day:
+        return jsonify({"success": False, "message": "请提供有效的生成时间范围"}), 400
+
+    excluded_dates = set(payload.get("excluded_dates") or [])
+    grade_ids = _normalize_id_list(payload.get("grade_ids"))
+    class_ids = _normalize_id_list(payload.get("class_ids"))
+    return_rate_raw = payload.get("return_rate", 0.7)
+    try:
+        return_rate = float(return_rate_raw)
+    except (TypeError, ValueError):
+        return_rate = 0.7
+    return_rate = max(0.0, min(return_rate, 1.0))
+
+    super_admin = _ensure_super_admin()
+
+    reader_query = Reader.query.filter(Reader.is_deleted.is_(False))
+    if class_ids:
+        reader_query = reader_query.filter(Reader.class_id.in_(class_ids))
+    elif grade_ids:
+        reader_query = reader_query.join(Class, Reader.reader_class).filter(
+            Class.is_deleted.is_(False), Class.grade_id.in_(grade_ids)
+        )
+
+    reader = reader_query.order_by(func.random()).first()
+    if not reader:
+        return jsonify({"success": False, "message": "没有符合条件的读者数据"}), 400
+
+    book_query = Book.query.filter(
+        Book.is_deleted.is_(False), Book.amount > Book.lend_amount
+    )
+    book = book_query.order_by(func.random()).first()
+    if not book:
+        return jsonify({"success": False, "message": "当前库存不足，无法生成借阅记录"}), 400
+
+    borrow_at = _pick_random_datetime(start_day, end_day, set(excluded_dates))
+    if not borrow_at:
+        return jsonify({"success": False, "message": "没有可用的生成日期"}), 400
+
+    lend = Lend(
+        book=book,
+        reader=reader,
+        amount=1,
+        due_date=borrow_at + timedelta(days=random.randint(15, 45)),
+        borrow_operator=super_admin,
+    )
+    lend.created_at = borrow_at
+    lend.updated_at = borrow_at
+    db.session.add(lend)
+    book.lend_amount += lend.amount
+
+    returned = False
+    return_at = None
+    if random.random() <= return_rate:
+        return_at = _pick_random_datetime(
+            borrow_at.date(),
+            end_day,
+            set(excluded_dates),
+            min_datetime=borrow_at + timedelta(minutes=10),
+        )
+        if return_at:
+            lend.status = "returned"
+            lend.return_operator = super_admin
+            lend.updated_at = return_at
+            return_record = ReturnRecord(
+                lend=lend,
+                amount=lend.amount,
+                operator=super_admin,
+            )
+            return_record.created_at = return_at
+            return_record.updated_at = return_at
+            db.session.add(return_record)
+            book.lend_amount = max(book.lend_amount - lend.amount, 0)
+            returned = True
+
+    db.session.commit()
+
+    return jsonify(
+        {
+            "success": True,
+            "lend_id": lend.id,
+            "returned": returned,
+            "borrowed_at": borrow_at.isoformat(),
+            "returned_at": return_at.isoformat() if return_at else None,
+        }
+    )
+
+
+@bp.route("/test-data/batches", methods=["POST"])
+@login_required
+def create_test_data_batch():
+    if not admin_required():
+        return jsonify({"success": False, "message": "权限不足"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    start_day = _parse_date(payload.get("start_date"))
+    end_day = _parse_date(payload.get("end_date"))
+    record_count = payload.get("record_count")
+    excluded_dates = payload.get("excluded_dates") or []
+    grade_ids = _normalize_id_list(payload.get("grade_ids"))
+    class_ids = _normalize_id_list(payload.get("class_ids"))
+    return_rate_raw = payload.get("return_rate", 0.7)
+    try:
+        return_rate = float(return_rate_raw)
+    except (TypeError, ValueError):
+        return_rate = 0.7
+    return_rate = max(0.0, min(return_rate, 1.0))
+
+    if not start_day or not end_day or start_day > end_day:
+        return jsonify({"success": False, "message": "请提供有效的生成时间范围"}), 400
+    if not isinstance(record_count, int) or record_count <= 0:
+        return jsonify({"success": False, "message": "请输入生成数量"}), 400
+
+    batch = TestDataBatch(
+        start_date=start_day,
+        end_date=end_day,
+        record_count=record_count,
+        excluded_dates=json.dumps(excluded_dates),
+        grade_ids=json.dumps(grade_ids),
+        class_ids=json.dumps(class_ids),
+        return_rate=return_rate,
+        triggered_by=current_user,
+    )
+    db.session.add(batch)
+    db.session.commit()
+
+    return jsonify({"success": True, "batch_id": batch.id})
+
+
+@bp.route("/test-data/batches/<int:batch_id>/delete", methods=["POST"])
+@login_required
+def delete_test_data_batch(batch_id: int):
+    if not admin_required():
+        return redirect(url_for("system.test_data"))
+
+    batch = TestDataBatch.query.get_or_404(batch_id)
+    super_admin = _ensure_super_admin()
+    deleted = _delete_super_admin_data(super_admin)
+    db.session.delete(batch)
+    db.session.commit()
+
+    flash(f"已删除 {deleted} 条测试数据", "success")
+    return redirect(url_for("system.test_data"))
 
 
 @bp.route("/backup", methods=["GET", "POST"])

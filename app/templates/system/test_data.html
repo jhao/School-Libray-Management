@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% block title %}测试数据生成{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>测试数据生成</h2>
+</div>
+<div class="row">
+  <div class="col-md-7">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>生成参数</strong>
+      </div>
+      <div class="panel-body">
+        <form
+          id="test-data-form"
+          class="form-horizontal"
+          autocomplete="off"
+          data-execute-endpoint="{{ url_for('system.execute_test_data') }}"
+          data-log-endpoint="{{ url_for('system.create_test_data_batch') }}"
+        >
+          <div class="form-group">
+            <label class="col-sm-3 control-label" for="start-date">开始日期</label>
+            <div class="col-sm-9">
+              <input type="date" id="start-date" name="start_date" class="form-control" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-3 control-label" for="end-date">结束日期</label>
+            <div class="col-sm-9">
+              <input type="date" id="end-date" name="end_date" class="form-control" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-3 control-label" for="record-count">生成数量</label>
+            <div class="col-sm-9">
+              <input type="number" id="record-count" name="record_count" class="form-control" min="1" max="500" value="20" required>
+              <span class="help-block">将逐条模拟借阅及归还流程以生成记录。</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-3 control-label">避开日期</label>
+            <div class="col-sm-9">
+              <div class="exclude-tags" id="exclude-tags"></div>
+              <div class="exclude-controls">
+                <input type="date" id="manual-exclude" class="form-control input-sm" style="max-width: 160px; display: inline-block;">
+                <button type="button" class="btn btn-default btn-sm" id="add-exclude">添加日期</button>
+              </div>
+              <span class="help-block">默认排除所选日期范围内的周六、周日，可根据需要自行调整。</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-3 control-label">年级 / 班级</label>
+            <div class="col-sm-9">
+              <div class="grade-tree" id="grade-tree">
+                {% if grade_tree %}
+                <ul class="list-unstyled">
+                  {% for grade in grade_tree %}
+                  <li>
+                    <label class="grade-label">
+                      <input type="checkbox" class="grade-checkbox" data-grade-id="{{ grade.id }}">
+                      {{ grade.name }}
+                    </label>
+                    {% if grade.classes %}
+                    <ul class="list-unstyled grade-classes">
+                      {% for klass in grade.classes %}
+                      <li>
+                        <label>
+                          <input type="checkbox" class="class-checkbox" data-grade-id="{{ grade.id }}" data-class-id="{{ klass.id }}">
+                          {{ klass.name }}
+                        </label>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted small">暂无班级数据</p>
+                    {% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">暂无年级与班级数据，生成将从所有读者中随机选择。</p>
+                {% endif %}
+              </div>
+              <span class="help-block">未选择时将从全部有效读者中随机抽取。</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-sm-3 control-label" for="return-rate">归还比例</label>
+            <div class="col-sm-9">
+              <div class="input-group" style="max-width: 200px;">
+                <input type="number" id="return-rate" name="return_rate" class="form-control" step="0.05" min="0" max="1" value="{{ default_return_rate }}">
+                <span class="input-group-addon">0-1</span>
+              </div>
+              <span class="help-block">用于决定每条借阅记录是否自动生成归还记录。</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="col-sm-offset-3 col-sm-9">
+              <button type="submit" class="btn btn-primary" id="start-generate">开始生成</button>
+              <button type="button" class="btn btn-default" id="reset-form">重置参数</button>
+            </div>
+          </div>
+        </form>
+        <div id="progress-wrapper" class="progress-wrapper hidden">
+          <div class="progress-text" id="progress-text">准备中...</div>
+          <div class="progress">
+            <div class="progress-bar progress-bar-success" id="progress-bar" role="progressbar" style="width: 0%" aria-valuemin="0" aria-valuemax="100">0%</div>
+          </div>
+        </div>
+        <div class="alert alert-info hidden" id="status-message"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>生成记录</strong>
+      </div>
+      <div class="panel-body">
+        {% if batches %}
+        <table class="table table-condensed">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>范围</th>
+              <th>数量</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for batch in batches %}
+            <tr>
+              <td>
+                {{ batch.created_at.strftime('%Y-%m-%d %H:%M') if batch.created_at else '' }}<br>
+                <small>执行人：{{ batch.triggered_by or '未知' }}</small>
+              </td>
+              <td>
+                {{ batch.start_date.strftime('%Y-%m-%d') if batch.start_date else '-' }}<br>
+                至 {{ batch.end_date.strftime('%Y-%m-%d') if batch.end_date else '-' }}
+                {% if batch.excluded_dates %}
+                <br><small>排除：{{ batch.excluded_dates | join(', ') }}</small>
+                {% endif %}
+              </td>
+              <td>
+                {{ batch.record_count }}<br>
+                <small>归还比例：{{ '%.0f' % (batch.return_rate * 100) }}%</small>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('system.delete_test_data_batch', batch_id=batch.id) }}" onsubmit="return confirm('确认删除所有由超级管理员生成的测试数据？');">
+                  <button type="submit" class="btn btn-xs btn-danger">删除测试数据</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">尚未生成任何测试数据。</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/test_data.js') }}"></script>
+{% endblock %}

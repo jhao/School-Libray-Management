@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from flask import Flask, request
+from flask_login import current_user
 
 from .constants import DEFAULT_BRAND_COLOR
 from .extensions import db, migrate, login_manager
@@ -57,6 +58,7 @@ NAV_SECTIONS = [
             {"endpoint": "system.create_user", "label": "新增用户"},
             {"endpoint": "system.system_settings", "label": "系统外观"},
             {"endpoint": "system.backup_restore", "label": "备份与恢复"},
+            {"endpoint": "system.test_data", "label": "测试数据", "admin_only": True},
         ],
         "prefixes": ["system."],
     },
@@ -115,14 +117,23 @@ def create_app(test_config=None):
         logo_path = SystemSetting.get_value("system_logo") or ""
         topbar_color = SystemSetting.get_value("topbar_color") or DEFAULT_BRAND_COLOR
         current_endpoint = request.endpoint or ""
-        nav_sections = [
-            {
-                "key": section["key"],
-                "title": section["title"],
-                "items": section["items"],
-            }
-            for section in NAV_SECTIONS
-        ]
+        nav_sections = []
+        for section in NAV_SECTIONS:
+            filtered_items = []
+            for item in section["items"]:
+                if item.get("admin_only"):
+                    if not current_user.is_authenticated or current_user.level != "admin":
+                        continue
+                filtered_items.append(item)
+            if not filtered_items:
+                continue
+            nav_sections.append(
+                {
+                    "key": section["key"],
+                    "title": section["title"],
+                    "items": filtered_items,
+                }
+            )
         return {
             "system_logo_path": logo_path,
             "system_topbar_color": topbar_color,

@@ -33,6 +33,22 @@ class User(UserMixin, TimestampMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
 
+class TestDataBatch(TimestampMixin, db.Model):
+    __tablename__ = "test_data_batches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+    record_count = db.Column(db.Integer, default=0)
+    excluded_dates = db.Column(db.Text)
+    grade_ids = db.Column(db.Text)
+    class_ids = db.Column(db.Text)
+    return_rate = db.Column(db.Numeric(4, 2))
+    triggered_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    triggered_by = db.relationship("User", foreign_keys=[triggered_by_id])
+
+
 class Category(SoftDeleteMixin, TimestampMixin, db.Model):
     __tablename__ = "categories"
 
