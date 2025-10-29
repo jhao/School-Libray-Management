@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List
 
-from flask import Request, request, url_for
+from flask import Request, request, session, url_for
 
 PER_PAGE_OPTIONS: tuple[int, ...] = (10, 20, 50, 100, 200)
 DEFAULT_PER_PAGE: int = 20
@@ -26,9 +26,14 @@ def get_page_args(req: Request | None = None) -> tuple[int, int]:
 
     req = req or request
     page = req.args.get("page", 1, type=int)
-    per_page = req.args.get("per_page", DEFAULT_PER_PAGE, type=int)
+    per_page_arg = req.args.get("per_page", type=int)
+    if per_page_arg is not None:
+        per_page = _resolve_per_page(per_page_arg)
+        session["pagination_per_page"] = per_page
+    else:
+        per_page = session.get("pagination_per_page", DEFAULT_PER_PAGE)
+        per_page = _resolve_per_page(per_page)
     page = max(page, 1)
-    per_page = _resolve_per_page(per_page)
     return page, per_page
 
 
