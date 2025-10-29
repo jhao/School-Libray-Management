@@ -59,31 +59,21 @@ def dashboard():
 
     lend_case_expr = Lend.id
     if lend_case_conditions:
-        lend_case_expr = case(
-            [
-                (
-                    and_(*lend_case_conditions)
-                    if len(lend_case_conditions) > 1
-                    else lend_case_conditions[0],
-                    Lend.id,
-                )
-            ],
-            else_=None,
+        lend_condition = (
+            and_(*lend_case_conditions)
+            if len(lend_case_conditions) > 1
+            else lend_case_conditions[0]
         )
+        lend_case_expr = case((lend_condition, Lend.id), else_=None)
 
     return_case_expr = ReturnRecord.id
     if return_case_conditions:
-        return_case_expr = case(
-            [
-                (
-                    and_(*return_case_conditions)
-                    if len(return_case_conditions) > 1
-                    else return_case_conditions[0],
-                    ReturnRecord.id,
-                )
-            ],
-            else_=None,
+        return_condition = (
+            and_(*return_case_conditions)
+            if len(return_case_conditions) > 1
+            else return_case_conditions[0]
         )
+        return_case_expr = case((return_condition, ReturnRecord.id), else_=None)
 
     grade_stats = (
         db.session.query(
