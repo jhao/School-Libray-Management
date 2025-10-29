@@ -4,11 +4,30 @@
 <div class="page-header">
   <h2>数据库备份与恢复</h2>
 </div>
-{% if not database_exists %}
+{% if database_backend == 'mysql' %}
+<div class="alert alert-info">
+  <p>当前系统配置使用 <strong>MySQL</strong> 数据库，内置的备份与恢复按钮不可用。请在服务器上使用以下命令完成操作：</p>
+  <ol>
+    <li>
+      <strong>备份：</strong>
+      <pre class="well well-sm" style="white-space: pre-wrap;">mysqldump -h &lt;host&gt; -u &lt;user&gt; -p'&lt;password&gt;' &lt;database&gt; &gt; library-$(date +%F).sql</pre>
+      将生成的 <code>.sql</code> 文件妥善保存或同步到备份存储。
+    </li>
+    <li>
+      <strong>恢复：</strong>
+      <pre class="well well-sm" style="white-space: pre-wrap;">mysql -h &lt;host&gt; -u &lt;user&gt; -p'&lt;password&gt;' &lt;database&gt; &lt; library-YYYY-MM-DD.sql</pre>
+      如需在 Docker 环境中执行，可使用 <code>docker compose exec db ...</code> 在数据库容器内运行上述命令。
+    </li>
+    <li>建议在维护窗口执行，并在恢复前后通过 <code>SHOW TABLES;</code>、<code>SELECT COUNT(*)</code> 等语句或应用自检确认数据完整性，同时记录操作日志。</li>
+    <li>确保部署环境中的 <code>SQLALCHEMY_DATABASE_URI</code> 等连接信息与实际的 MySQL 实例保持一致，以便应用在恢复后正常工作。</li>
+  </ol>
+</div>
+{% elif not database_exists %}
 <div class="alert alert-warning">
   当前数据库不支持备份或数据库文件不存在，请检查系统配置。
 </div>
 {% endif %}
+{% if database_backend != 'mysql' %}
 <div class="row">
   <div class="col-md-6">
     <div class="panel panel-default">
@@ -42,6 +61,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 <div class="panel panel-default">
   <div class="panel-heading">
     <h3 class="panel-title">操作日志</h3>
