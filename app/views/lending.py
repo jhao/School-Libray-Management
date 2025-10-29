@@ -24,6 +24,7 @@ bp = Blueprint("lending", __name__, url_prefix="/lending")
 @bp.route("/borrow", methods=["GET", "POST"])
 @login_required
 def borrow():
+    isbn_prefill = request.args.get("isbn", "").strip()
     if request.method == "POST":
         card_no = request.form.get("card_no", "").strip()
         isbn = request.form.get("isbn", "").strip()
@@ -33,14 +34,14 @@ def borrow():
         reader = find_reader_by_card(card_no)
         if not reader:
             flash("未找到读者信息", "danger")
-            return redirect(url_for("lending.borrow"))
+            return redirect(url_for("lending.borrow", isbn=isbn))
         book = find_book_by_isbn(isbn)
         if not book:
             flash("未找到对应图书", "danger")
-            return redirect(url_for("lending.borrow"))
+            return redirect(url_for("lending.borrow", isbn=isbn))
         if book.available_amount() < amount:
             flash("库存不足", "danger")
-            return redirect(url_for("lending.borrow"))
+            return redirect(url_for("lending.borrow", isbn=isbn))
 
         lend = Lend(
             book=book,
@@ -60,7 +61,7 @@ def borrow():
         .limit(20)
         .all()
     )
-    return render_template("lending/borrow.html", lends=lends)
+    return render_template("lending/borrow.html", lends=lends, isbn_prefill=isbn_prefill)
 
 
 @bp.route("/return", methods=["GET", "POST"])
@@ -200,3 +201,27 @@ def records():
         classes=classes,
         filters=filters,
     )
+
+
+@bp.route("/<int:lend_id>/return", methods=["POST"])
+@login_required
+def return_from_record(lend_id: int):
+    lend = Lend.query.options(selectinload(Lend.book)).filter_by(
+        id=lend_id, is_deleted=False
+    ).first_or_404()
+
+    if lend.status != "lent":
+        flash("该借阅记录已归还", "warning")
+        next_url = request.form.get("next")
+        return redirect(next_url or url_for("lending.records"))
+
+    return_record = ReturnRecord(lend=lend, amount=lend.amount)
+    lend.mark_returned()
+    if lend.book:
+        lend.book.lend_amount = max(lend.book.lend_amount - lend.amount, 0)
+    db.session.add(return_record)
+    db.session.commit()
+    flash("归还成功", "success")
+
+    next_url = request.form.get("next")
+    return redirect(next_url or url_for("lending.records"))

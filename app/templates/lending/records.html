@@ -62,6 +62,7 @@
         <th>数量</th>
         <th>应还日期</th>
         <th>状态</th>
+        <th>操作</th>
       </tr>
     </thead>
     <tbody>
@@ -84,10 +85,18 @@
           <span class="label label-warning">已借出</span>
           {% endif %}
         </td>
+        <td>
+          {% if record.status == 'lent' %}
+          <form method="post" action="{{ url_for('lending.return_from_record', lend_id=record.id) }}" style="display:inline" onsubmit="return confirm('确认归还该借阅记录吗？');">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button type="submit" class="btn btn-xs btn-success">归还</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="7" class="text-center text-muted">暂无借阅记录</td>
+        <td colspan="8" class="text-center text-muted">暂无借阅记录</td>
       </tr>
       {% endfor %}
     </tbody>
