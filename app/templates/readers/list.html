@@ -101,18 +101,27 @@
               <input type="text" name="card_no" value="{{ reader.card_no }}" class="form-control input-sm" placeholder="卡号">
               <input type="text" name="name" value="{{ reader.name }}" class="form-control input-sm" placeholder="姓名">
               <input type="text" name="phone" value="{{ reader.phone }}" class="form-control input-sm" placeholder="电话">
-              <select name="sex" class="form-control input-sm">
-                <option value="">未填写</option>
-                <option value="男" {% if reader.sex == '男' %}selected{% endif %}>男</option>
-                <option value="女" {% if reader.sex == '女' %}selected{% endif %}>女</option>
-              </select>
+              <div class="form-group">
+                <label class="radio-inline">
+                  <input type="radio" name="sex" value="" {% if not reader.sex %}checked{% endif %}> 未填写
+                </label>
+                <label class="radio-inline">
+                  <input type="radio" name="sex" value="男" {% if reader.sex == '男' %}checked{% endif %}> 男
+                </label>
+                <label class="radio-inline">
+                  <input type="radio" name="sex" value="女" {% if reader.sex == '女' %}checked{% endif %}> 女
+                </label>
+              </div>
               <select name="class_id" class="form-control input-sm">
                 <option value="">未分配</option>
                 {% for klass in classes %}
                 <option value="{{ klass.id }}" {% if reader.class_id == klass.id %}selected{% endif %}>{{ klass.grade.name if klass.grade else '' }}{{ klass.name }}</option>
                 {% endfor %}
               </select>
+              <input type="hidden" name="cert_type" value="{{ reader.cert_type or '' }}">
+              <input type="hidden" name="cert_no" value="{{ reader.cert_no or '' }}">
               <button type="submit" class="btn btn-sm btn-primary">保存</button>
+              <button type="button" class="btn btn-sm btn-default" data-toggle="collapse" data-target="#reader-{{ reader.id }}">取消</button>
             </form>
           </td>
         </tr>
