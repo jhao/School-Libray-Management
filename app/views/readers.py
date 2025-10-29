@@ -48,33 +48,39 @@ bp = Blueprint("readers", __name__, url_prefix="/readers")
 @login_required
 def list_readers():
     keyword = request.args.get("q", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
     query = Reader.query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Reader.name.like(like)) | (Reader.card_no.like(like)))
-    readers = query.order_by(Reader.updated_at.desc()).all()
-    grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
+    pagination = query.order_by(Reader.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     classes = Class.query.filter_by(is_deleted=False).order_by(Class.name).all()
     return render_template(
         "readers/list.html",
-        readers=readers,
-        grades=grades,
-        classes=classes,
+        readers=pagination.items,
         keyword=keyword,
+        pagination=pagination,
+        classes=classes,
     )
 
 
-@bp.route("/create", methods=["POST"])
+@bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_reader():
+    classes = Class.query.filter_by(is_deleted=False).order_by(Class.name).all()
+
+    if request.method == "GET":
+        return render_template("readers/create.html", classes=classes)
+
     form = request.form
     card_no = form.get("card_no", "").strip()
     if not card_no:
         flash("读者卡号不能为空", "danger")
-        return redirect(url_for("readers.list_readers"))
+        return redirect(url_for("readers.create_reader"))
     if Reader.query.filter_by(card_no=card_no).first():
         flash("卡号已存在", "danger")
-        return redirect(url_for("readers.list_readers"))
+        return redirect(url_for("readers.create_reader"))
     reader = Reader(
         card_no=card_no,
         name=form.get("name", "未命名读者"),
@@ -120,14 +126,18 @@ def delete_reader(reader_id: int):
 @bp.route("/import", methods=["POST"])
 @login_required
 def import_readers():
-    file = request.files.get("file")
-    if not file:
-        flash("请选择Excel文件", "danger")
-        return redirect(url_for("readers.list_readers"))
-
     _, load_workbook_fn, has_openpyxl = _ensure_openpyxl()
     if not has_openpyxl or load_workbook_fn is None:
         flash("当前环境缺少 openpyxl 依赖，无法导入读者数据。", "danger")
+        return redirect(url_for("readers.list_readers"))
+
+    if request.form.get("template_confirmed") != "1":
+        flash("请先下载导入模板并确认后再上传数据。", "warning")
+        return redirect(url_for("readers.list_readers"))
+
+    file = request.files.get("file")
+    if not file:
+        flash("请选择Excel文件", "danger")
         return redirect(url_for("readers.list_readers"))
 
     try:
@@ -156,6 +166,28 @@ def import_readers():
         flash(f"导入失败: {exc}", "danger")
 
     return redirect(url_for("readers.list_readers"))
+
+
+@bp.route("/import-template")
+@login_required
+def download_reader_template():
+    workbook_cls, _, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or workbook_cls is None:
+        flash("当前环境缺少 openpyxl 依赖，无法生成模板。", "danger")
+        return redirect(url_for("readers.list_readers"))
+
+    wb = workbook_cls()
+    ws = wb.active
+    ws.append(["卡号", "姓名", "电话", "性别"])
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name="reader-import-template.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @bp.route("/export")
@@ -191,21 +223,32 @@ def export_readers():
     )
 
 
-@bp.route("/grades", methods=["GET", "POST"])
+@bp.route("/grades")
 @login_required
 def manage_grades():
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        if not name:
-            flash("年级名称不能为空", "danger")
-            return redirect(url_for("readers.manage_grades"))
-        grade = Grade(name=name)
-        db.session.add(grade)
-        db.session.commit()
-        flash("年级创建成功", "success")
-        return redirect(url_for("readers.manage_grades"))
-    grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
-    return render_template("readers/grades.html", grades=grades)
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    pagination = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    return render_template("readers/grades.html", grades=pagination.items, pagination=pagination)
+
+
+@bp.route("/grades/create", methods=["GET", "POST"])
+@login_required
+def create_grade():
+    if request.method == "GET":
+        return render_template("readers/grades_create.html")
+
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("年级名称不能为空", "danger")
+        return redirect(url_for("readers.create_grade"))
+    grade = Grade(name=name)
+    db.session.add(grade)
+    db.session.commit()
+    flash("年级创建成功", "success")
+    return redirect(url_for("readers.manage_grades"))
 
 
 @bp.route("/grades/<int:grade_id>/delete", methods=["POST"])
@@ -218,23 +261,42 @@ def delete_grade(grade_id: int):
     return redirect(url_for("readers.manage_grades"))
 
 
-@bp.route("/classes", methods=["GET", "POST"])
+@bp.route("/classes")
 @login_required
 def manage_classes():
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    pagination = (
+        Class.query.filter_by(is_deleted=False)
+        .order_by(Class.name)
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
     grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        grade_id = request.form.get("grade_id") or None
-        if not name or not grade_id:
-            flash("班级名称与所属年级不能为空", "danger")
-            return redirect(url_for("readers.manage_classes"))
-        klass = Class(name=name, grade_id=grade_id)
-        db.session.add(klass)
-        db.session.commit()
-        flash("班级创建成功", "success")
-        return redirect(url_for("readers.manage_classes"))
-    classes = Class.query.filter_by(is_deleted=False).order_by(Class.name).all()
-    return render_template("readers/classes.html", grades=grades, classes=classes)
+    return render_template(
+        "readers/classes.html",
+        classes=pagination.items,
+        grades=grades,
+        pagination=pagination,
+    )
+
+
+@bp.route("/classes/create", methods=["GET", "POST"])
+@login_required
+def create_class():
+    grades = Grade.query.filter_by(is_deleted=False).order_by(Grade.name).all()
+    if request.method == "GET":
+        return render_template("readers/classes_create.html", grades=grades)
+
+    name = request.form.get("name", "").strip()
+    grade_id = request.form.get("grade_id")
+    if not name or not grade_id:
+        flash("班级名称与所属年级不能为空", "danger")
+        return redirect(url_for("readers.create_class"))
+    klass = Class(name=name, grade_id=int(grade_id))
+    db.session.add(klass)
+    db.session.commit()
+    flash("班级创建成功", "success")
+    return redirect(url_for("readers.manage_classes"))
 
 
 @bp.route("/classes/<int:class_id>/delete", methods=["POST"])

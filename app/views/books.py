@@ -53,26 +53,36 @@ bp = Blueprint("books", __name__, url_prefix="/books")
 @login_required
 def list_books():
     keyword = request.args.get("q", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
     query = Book.query.filter_by(is_deleted=False)
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Book.name.like(like)) | (Book.isbn.like(like)))
-    books = query.order_by(Book.updated_at.desc()).all()
-    categories = Category.query.filter_by(is_deleted=False).order_by(Category.name).all()
-    return render_template("books/list.html", books=books, categories=categories, keyword=keyword)
+    pagination = query.order_by(Book.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    return render_template(
+        "books/list.html",
+        books=pagination.items,
+        keyword=keyword,
+        pagination=pagination,
+    )
 
 
-@bp.route("/create", methods=["POST"])
+@bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_book():
+    if request.method == "GET":
+        categories = Category.query.filter_by(is_deleted=False).order_by(Category.name).all()
+        return render_template("books/create.html", categories=categories)
+
     form = request.form
     isbn = form.get("isbn", "").strip()
     if not isbn:
         flash("ISBN不能为空", "danger")
-        return redirect(url_for("books.list_books"))
+        return redirect(url_for("books.create_book"))
     if Book.query.filter_by(isbn=isbn).first():
         flash("该ISBN已存在", "danger")
-        return redirect(url_for("books.list_books"))
+        return redirect(url_for("books.create_book"))
 
     book = Book(
         name=form.get("name", "未命名图书"),
@@ -144,6 +154,10 @@ def import_books():
         flash("未安装 openpyxl 库，无法导入。请先运行 pip install openpyxl。", "danger")
         return redirect(url_for("books.list_books"))
 
+    if request.form.get("template_confirmed") != "1":
+        flash("请先下载导入模板并确认后再上传数据。", "warning")
+        return redirect(url_for("books.list_books"))
+
     file = request.files.get("file")
     if not file:
         flash("请选择Excel文件", "danger")
@@ -179,6 +193,28 @@ def import_books():
         flash(f"导入失败: {exc}", "danger")
 
     return redirect(url_for("books.list_books"))
+
+
+@bp.route("/import-template")
+@login_required
+def download_import_template():
+    workbook_cls, _, has_openpyxl = _ensure_openpyxl()
+    if not has_openpyxl or workbook_cls is None:
+        flash("未安装 openpyxl 库，无法生成模板。请先运行 pip install openpyxl。", "danger")
+        return redirect(url_for("books.list_books"))
+
+    wb = workbook_cls()
+    ws = wb.active
+    ws.append(["图书名称", "ISBN", "位置", "数量", "价格", "出版社", "作者", "简介"])
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name="book-import-template.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @bp.route("/export")

@@ -4,6 +4,8 @@ from typing import Optional
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from sqlalchemy.exc import OperationalError
+
 from .extensions import db
 
 
@@ -132,6 +134,37 @@ class ReturnRecord(SoftDeleteMixin, TimestampMixin, db.Model):
     comment = db.Column(db.Text)
 
     lend = db.relationship("Lend", backref="returns")
+
+
+class SystemSetting(TimestampMixin, db.Model):
+    __tablename__ = "system_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(64), unique=True, nullable=False)
+    value = db.Column(db.Text)
+
+    @staticmethod
+    def get_value(key: str, default: Optional[str] = None) -> Optional[str]:
+        try:
+            setting = SystemSetting.query.filter_by(key=key).first()
+        except OperationalError:
+            db.session.rollback()
+            return default
+        return setting.value if setting else default
+
+    @staticmethod
+    def set_value(key: str, value: Optional[str]) -> None:
+        try:
+            setting = SystemSetting.query.filter_by(key=key).first()
+        except OperationalError:
+            db.session.rollback()
+            setting = None
+        if setting is None:
+            setting = SystemSetting(key=key, value=value)
+            db.session.add(setting)
+        else:
+            setting.value = value
+        db.session.commit()
 
 
 def ensure_seed_data(username: str = "admin", password: str = "admin123") -> None:

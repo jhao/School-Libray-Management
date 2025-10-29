@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask
 
 from .extensions import db, migrate, login_manager
-from .models import User
+from .models import SystemSetting, User
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -38,6 +38,15 @@ def create_app(test_config=None):
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+
+    @app.context_processor
+    def inject_system_settings():
+        logo_path = SystemSetting.get_value("system_logo") or ""
+        topbar_color = SystemSetting.get_value("topbar_color") or "#1f2d3d"
+        return {
+            "system_logo_path": logo_path,
+            "system_topbar_color": topbar_color,
+        }
 
     return app
 
