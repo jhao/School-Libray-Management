@@ -5,7 +5,8 @@ from importlib.util import find_spec
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 if TYPE_CHECKING:  # pragma: no cover - used solely for type checkers
     from openpyxl import Workbook as WorkbookType
@@ -66,7 +67,10 @@ def _category_options():
 def list_books():
     keyword = request.args.get("q", "").strip()
     page, per_page = get_page_args()
-    query = Book.query.filter_by(is_deleted=False)
+    query = (
+        Book.query.filter_by(is_deleted=False)
+        .options(joinedload(Book.category), joinedload(Book.updated_by))
+    )
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Book.name.like(like)) | (Book.isbn.like(like)))
@@ -134,6 +138,7 @@ def create_book():
         input_num=form.get("input_num") or None,
         remark=form.get("remark"),
     )
+    book.updated_by_id = current_user.id
     db.session.add(book)
     db.session.commit()
     flash("图书创建成功", "success")
@@ -187,6 +192,7 @@ def update_book(book_id: int):
     book.summary = form.get("summary")
     book.input_num = form.get("input_num") or book.input_num
     book.remark = form.get("remark")
+    book.updated_by_id = current_user.id
     db.session.commit()
     flash("图书信息已更新", "success")
     return redirect(url_for("books.list_books"))
@@ -197,6 +203,7 @@ def update_book(book_id: int):
 def delete_book(book_id: int):
     book = Book.query.get_or_404(book_id)
     book.is_deleted = True
+    book.updated_by_id = current_user.id
     db.session.commit()
     flash("图书已删除", "success")
     return redirect(url_for("books.list_books"))
@@ -240,6 +247,7 @@ def import_books():
                 author=row[6],
                 summary=row[7],
             )
+            book.updated_by_id = current_user.id
             db.session.add(book)
             count += 1
         db.session.commit()
