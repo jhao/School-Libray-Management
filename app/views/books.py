@@ -336,8 +336,15 @@ def import_books():
 
             category_raw = str(row[2]) if len(row) > 2 and row[2] is not None else ""
             category_value = category_raw.strip() if category_raw else ""
-            position = row[3] if len(row) > 3 else None
-            raw_amount = row[4] if len(row) > 4 else None
+            call_number_raw = row[3] if len(row) > 3 else None
+            call_number = (
+                str(call_number_raw).strip() if call_number_raw not in (None, "") else None
+            )
+            position_raw = row[4] if len(row) > 4 else None
+            position = (
+                str(position_raw).strip() if position_raw not in (None, "") else None
+            )
+            raw_amount = row[5] if len(row) > 5 else None
             try:
                 if raw_amount in (None, ""):
                     amount = 1
@@ -350,10 +357,10 @@ def import_books():
                 skipped.append(f"第{index}行(ISBN {isbn}): 数量必须大于0")
                 continue
 
-            price = row[5] if len(row) > 5 else 0
-            publisher = row[6] if len(row) > 6 else None
-            author = row[7] if len(row) > 7 else None
-            summary = row[8] if len(row) > 8 else None
+            price = row[6] if len(row) > 6 else 0
+            publisher = row[7] if len(row) > 7 else None
+            author = row[8] if len(row) > 8 else None
+            summary = row[9] if len(row) > 9 else None
 
             category_obj = None
             if category_raw:
@@ -377,6 +384,7 @@ def import_books():
             existing_deleted = Book.query.filter_by(isbn=isbn, is_deleted=True).first()
             if existing_deleted:
                 existing_deleted.name = name_value or existing_deleted.name or "未命名图书"
+                existing_deleted.call_number = call_number
                 existing_deleted.position = position
                 existing_deleted.amount = amount
                 existing_deleted.lend_amount = 0
@@ -393,6 +401,7 @@ def import_books():
             book = Book(
                 name=name_value,
                 isbn=isbn,
+                call_number=call_number,
                 position=position,
                 amount=amount,
                 price=price or 0,
@@ -438,7 +447,18 @@ def download_import_template():
     wb = workbook_cls()
     ws = wb.active
     ws.title = "图书信息"
-    ws.append(["图书名称", "ISBN", "分类", "位置", "数量", "价格", "出版社", "作者", "简介"])
+    ws.append([
+        "图书名称",
+        "ISBN",
+        "分类",
+        "索书码",
+        "位置",
+        "数量",
+        "价格",
+        "出版社",
+        "作者",
+        "简介",
+    ])
 
     categories = (
         Category.query.filter_by(is_deleted=False)
