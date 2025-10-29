@@ -68,7 +68,12 @@ def borrow():
         .limit(20)
         .all()
     )
-    return render_template("lending/borrow.html", lends=lends, isbn_prefill=isbn_prefill)
+    return render_template(
+        "lending/borrow.html",
+        lends=lends,
+        isbn_prefill=isbn_prefill,
+        current_time=datetime.utcnow(),
+    )
 
 
 @bp.route("/return", methods=["GET", "POST"])

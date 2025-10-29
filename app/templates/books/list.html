@@ -2,7 +2,10 @@
 {% block title %}图书列表{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h2>图书列表</h2>
+  <div class="page-header-title">
+    <h2>图书列表</h2>
+    <span class="page-header-meta">共 {{ pagination.total }} 条数据</span>
+  </div>
 </div>
 <div class="action-toolbar">
   <div class="action-group">

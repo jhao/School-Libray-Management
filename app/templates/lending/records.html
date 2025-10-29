@@ -13,33 +13,13 @@
   .record-meta strong {
     font-weight: 600;
   }
-  .due-label {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    color: #fff;
-    min-width: 96px;
-    text-align: center;
-  }
-  .due-safe {
-    background-color: #4caf50;
-  }
-  .due-warning {
-    background-color: #fbc02d;
-    color: #333;
-  }
-  .due-urgent {
-    background-color: #ff9800;
-  }
-  .due-overdue {
-    background-color: #f44336;
-  }
 </style>
 {% endblock %}
 {% block content %}
 <div class="page-header">
-  <h2>借阅记录</h2>
+  <div class="page-header-title">
+    <h2>借阅记录</h2>
+  </div>
 </div>
 <div class="panel panel-default">
   <div class="panel-body">
@@ -130,8 +110,11 @@
         </td>
         <td>{{ record.book.name if record.book else '' }}{% if record.book %} ({{ record.book.isbn }}){% endif %}</td>
         <td>{{ record.amount }}</td>
-        {% set due_class = '' %}
         {% if record.due_date %}
+        {% set due_class = '' %}
+        {% if record.status == 'returned' %}
+        {% set due_class = 'due-returned' %}
+        {% else %}
         {% set days_diff = (record.due_date.date() - current_time.date()).days %}
         {% if days_diff >= 30 %}
         {% set due_class = 'due-safe' %}
@@ -141,6 +124,7 @@
         {% set due_class = 'due-urgent' %}
         {% else %}
         {% set due_class = 'due-overdue' %}
+        {% endif %}
         {% endif %}
         <td>
           <span class="due-label {{ due_class }}">{{ record.due_date.strftime('%Y-%m-%d') }}</span>
