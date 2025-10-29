@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}借阅记录{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>借阅记录</h2>
+</div>
+<div class="panel panel-default">
+  <div class="panel-body">
+    <form class="form-inline" method="get">
+      <div class="form-group">
+        <input type="text" name="card_no" class="form-control input-sm" placeholder="读者卡号" value="{{ filters.card_no }}">
+      </div>
+      <div class="form-group">
+        <input type="text" name="reader_name" class="form-control input-sm" placeholder="读者姓名" value="{{ filters.reader_name }}">
+      </div>
+      <div class="form-group">
+        <input type="text" name="isbn" class="form-control input-sm" placeholder="图书ISBN" value="{{ filters.isbn }}">
+      </div>
+      <div class="form-group">
+        <input type="text" name="book_name" class="form-control input-sm" placeholder="图书名称" value="{{ filters.book_name }}">
+      </div>
+      <div class="form-group">
+        <select name="grade_id" class="form-control input-sm">
+          <option value="" {% if filters.grade_id is none %}selected{% endif %}>全部年级</option>
+          {% for grade in grades %}
+          <option value="{{ grade.id }}" {% if filters.grade_id == grade.id %}selected{% endif %}>{{ grade.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <select name="class_id" class="form-control input-sm">
+          <option value="" {% if filters.class_id is none %}selected{% endif %}>全部班级</option>
+          {% for klass in classes %}
+          <option value="{{ klass.id }}" {% if filters.class_id == klass.id %}selected{% endif %}>{{ klass.grade.name if klass.grade else '' }}{{ klass.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="control-label">借出日期</label>
+        <input type="date" name="start_date" class="form-control input-sm" value="{{ filters.start_date }}">
+        <span class="text-muted">至</span>
+        <input type="date" name="end_date" class="form-control input-sm" value="{{ filters.end_date }}">
+      </div>
+      <div class="form-group">
+        <select name="status" class="form-control input-sm">
+          <option value="all" {% if filters.status == 'all' %}selected{% endif %}>全部状态</option>
+          <option value="lent" {% if filters.status == 'lent' %}selected{% endif %}>已借出</option>
+          <option value="returned" {% if filters.status == 'returned' %}selected{% endif %}>已归还</option>
+        </select>
+      </div>
+      <button class="btn btn-sm btn-primary" type="submit">检索</button>
+      <a class="btn btn-sm btn-default" href="{{ url_for('lending.records') }}">重置</a>
+    </form>
+  </div>
+  <table class="table table-striped table-condensed table-hover">
+    <thead>
+      <tr>
+        <th>借出时间</th>
+        <th>读者信息</th>
+        <th>年级/班级</th>
+        <th>图书信息</th>
+        <th>数量</th>
+        <th>应还日期</th>
+        <th>状态</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M') if record.created_at else '' }}</td>
+        <td>{{ record.reader.name if record.reader else '' }}{% if record.reader %} ({{ record.reader.card_no }}){% endif %}</td>
+        <td>
+          {% if record.reader and record.reader.reader_class %}
+            {{ record.reader.reader_class.grade.name if record.reader.reader_class.grade else '' }} {{ record.reader.reader_class.name }}
+          {% endif %}
+        </td>
+        <td>{{ record.book.name if record.book else '' }}{% if record.book %} ({{ record.book.isbn }}){% endif %}</td>
+        <td>{{ record.amount }}</td>
+        <td>{{ record.due_date.strftime('%Y-%m-%d') if record.due_date else '' }}</td>
+        <td>
+          {% if record.status == 'returned' %}
+          <span class="label label-success">已归还</span>
+          {% else %}
+          <span class="label label-warning">已借出</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center text-muted">暂无借阅记录</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include '_pagination.html' %}
+{% endblock %}
