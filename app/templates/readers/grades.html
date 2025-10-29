@@ -19,9 +19,11 @@
     <tr>
       <td>{{ grade.name }}</td>
       <td>
+        {% if current_user.level == 'admin' %}
         <form method="post" action="{{ url_for('readers.delete_grade', grade_id=grade.id) }}" onsubmit="return confirm('确认删除?');" style="display:inline">
           <button type="submit" class="btn btn-xs btn-danger">删除</button>
         </form>
+        {% endif %}
       </td>
     </tr>
     {% else %}

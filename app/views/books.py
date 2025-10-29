@@ -216,6 +216,9 @@ def update_book(book_id: int):
 @bp.route("/<int:book_id>/delete", methods=["POST"])
 @login_required
 def delete_book(book_id: int):
+    if current_user.level != "admin":
+        flash("只有管理员可以执行删除操作", "danger")
+        return redirect(url_for("books.list_books"))
     book = Book.query.get_or_404(book_id)
     book.is_deleted = True
     book.updated_by_id = current_user.id
