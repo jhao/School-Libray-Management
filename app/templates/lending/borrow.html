@@ -4,7 +4,7 @@
 <div class="row">
   <div class="col-sm-4 col-md-3">
     <h4>借书操作</h4>
-    <form method="post" id="borrow-form">
+    <form method="post" id="borrow-form" data-records-url="{{ url_for('lending.borrow_records') }}">
       <div class="form-group">
         <label>读者卡号</label>
         <input type="text" name="card_no" class="form-control" required>
@@ -87,13 +87,118 @@
     }
     var isbnInput = form.querySelector('input[name="isbn"]');
     var submitButton = form.querySelector('button[type="submit"]');
-    if (!isbnInput || !submitButton) {
+    if (isbnInput && submitButton) {
+      isbnInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          submitButton.focus();
+        }
+      });
+    }
+
+    var cardInput = form.querySelector('input[name="card_no"]');
+    var recordsUrl = form.getAttribute('data-records-url');
+    var tableBody = document.querySelector('.table.table-striped tbody');
+    if (!cardInput || !recordsUrl || !tableBody) {
       return;
     }
-    isbnInput.addEventListener('keydown', function(event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        submitButton.focus();
+
+    var lastFetchedCardNo = '';
+
+    function renderRecords(lends) {
+      tableBody.innerHTML = '';
+      if (!Array.isArray(lends) || lends.length === 0) {
+        var emptyRow = document.createElement('tr');
+        var emptyCell = document.createElement('td');
+        emptyCell.colSpan = 7;
+        emptyCell.className = 'text-center text-muted';
+        emptyCell.textContent = '暂无借阅记录';
+        emptyRow.appendChild(emptyCell);
+        tableBody.appendChild(emptyRow);
+        return;
+      }
+
+      lends.forEach(function(lend) {
+        var row = document.createElement('tr');
+
+        var createdAtCell = document.createElement('td');
+        createdAtCell.textContent = lend.created_at || '—';
+        row.appendChild(createdAtCell);
+
+        var readerCell = document.createElement('td');
+        readerCell.textContent = lend.reader || '—';
+        row.appendChild(readerCell);
+
+        var bookCell = document.createElement('td');
+        bookCell.textContent = lend.book || '—';
+        row.appendChild(bookCell);
+
+        var amountCell = document.createElement('td');
+        amountCell.textContent = lend.amount != null ? lend.amount : '—';
+        row.appendChild(amountCell);
+
+        var dueCell = document.createElement('td');
+        if (lend.due_date) {
+          var dueSpan = document.createElement('span');
+          dueSpan.className = 'due-label' + (lend.due_class ? ' ' + lend.due_class : '');
+          dueSpan.textContent = lend.due_date;
+          dueCell.appendChild(dueSpan);
+        } else {
+          dueCell.textContent = '—';
+        }
+        row.appendChild(dueCell);
+
+        var operatorCell = document.createElement('td');
+        operatorCell.textContent = lend.borrow_operator || '—';
+        row.appendChild(operatorCell);
+
+        var statusCell = document.createElement('td');
+        statusCell.textContent = lend.status_text || '—';
+        row.appendChild(statusCell);
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function fetchRecords(cardNo) {
+      var trimmed = cardNo.trim();
+      if (trimmed === lastFetchedCardNo) {
+        return;
+      }
+      var url = recordsUrl;
+      if (trimmed) {
+        url += '?card_no=' + encodeURIComponent(trimmed);
+      }
+      fetch(url, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error('Failed to fetch records');
+          }
+          return response.json();
+        })
+        .then(function(data) {
+          if (!data || !Array.isArray(data.lends)) {
+            return;
+          }
+          renderRecords(data.lends);
+          lastFetchedCardNo = trimmed;
+        })
+        .catch(function(error) {
+          console.error(error);
+        });
+    }
+
+    cardInput.addEventListener('blur', function() {
+      fetchRecords(cardInput.value);
+    });
+
+    cardInput.addEventListener('input', function() {
+      if (cardInput.value.trim() === '') {
+        fetchRecords('');
       }
     });
   });

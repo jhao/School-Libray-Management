@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
 from flask_login import current_user, login_required
 from sqlalchemy import case, func
 from sqlalchemy.orm import selectinload
@@ -75,6 +75,75 @@ def borrow():
         isbn_prefill=isbn_prefill,
         current_time=datetime.utcnow(),
     )
+
+
+@bp.route("/borrow/records")
+@login_required
+def borrow_records():
+    card_no = request.args.get("card_no", "").strip()
+
+    query = (
+        Lend.query.filter_by(is_deleted=False)
+        .options(
+            selectinload(Lend.reader),
+            selectinload(Lend.book),
+            selectinload(Lend.borrow_operator),
+        )
+        .order_by(Lend.created_at.desc())
+    )
+
+    if card_no:
+        reader = find_reader_by_card(card_no)
+        if not reader:
+            return jsonify({"lends": []})
+        query = query.filter(Lend.reader == reader)
+
+    lends = query.limit(20).all()
+    current_time = datetime.utcnow()
+
+    def build_due_info(lend: Lend):
+        if not lend.due_date:
+            return "", ""
+        if lend.status == "returned":
+            due_class = "due-returned"
+        else:
+            days_diff = (lend.due_date.date() - current_time.date()).days
+            if days_diff >= 30:
+                due_class = "due-safe"
+            elif days_diff >= 10:
+                due_class = "due-warning"
+            elif days_diff >= 0:
+                due_class = "due-urgent"
+            else:
+                due_class = "due-overdue"
+        return lend.due_date.strftime("%Y-%m-%d"), due_class
+
+    payload = []
+    for lend in lends:
+        due_text, due_class = build_due_info(lend)
+        payload.append(
+            {
+                "id": lend.id,
+                "created_at": lend.created_at.strftime("%Y-%m-%d %H:%M")
+                if lend.created_at
+                else "—",
+                "reader": f"{lend.reader.name} ({lend.reader.card_no})"
+                if lend.reader
+                else "—",
+                "book": f"{lend.book.name} ({lend.book.isbn})"
+                if lend.book
+                else "—",
+                "amount": lend.amount,
+                "due_date": due_text,
+                "due_class": due_class,
+                "borrow_operator": lend.borrow_operator.username
+                if lend.borrow_operator
+                else "—",
+                "status_text": "已归还" if lend.status == "returned" else "借出中",
+            }
+        )
+
+    return jsonify({"lends": payload})
 
 
 @bp.route("/return", methods=["GET", "POST"])
