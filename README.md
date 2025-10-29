@@ -61,6 +61,18 @@
    docker compose up -d --build
    ```
 
+   若仅使用 SQLite，可直接通过 Docker CLI 启动单个容器：
+
+   ```bash
+   docker build -t school-library .
+   docker run -d \
+     --name school-library \
+     -p 5000:5000 \
+     -e SECRET_KEY=change-me \
+     -v "$(pwd)/instance:/app/instance" \
+     school-library
+   ```
+
 2. 首次启动后进入容器执行数据库初始化：
 
    ```bash
