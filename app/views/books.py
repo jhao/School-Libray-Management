@@ -66,6 +66,10 @@ def _category_options():
 @login_required
 def list_books():
     keyword = request.args.get("q", "").strip()
+    call_number = request.args.get("call_number", "").strip()
+    position = request.args.get("position", "").strip()
+    category_id_raw = request.args.get("category_id", "").strip()
+    category_id = int(category_id_raw) if category_id_raw.isdigit() else None
     page, per_page = get_page_args()
     query = (
         Book.query.filter_by(is_deleted=False)
@@ -74,11 +78,22 @@ def list_books():
     if keyword:
         like = f"%{keyword}%"
         query = query.filter((Book.name.like(like)) | (Book.isbn.like(like)))
+    if call_number:
+        query = query.filter(Book.call_number.like(f"%{call_number}%"))
+    if position:
+        query = query.filter(Book.position.like(f"%{position}%"))
+    if category_id is not None:
+        query = query.filter(Book.category_id == category_id)
     pagination = query.order_by(Book.updated_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
     return render_template(
         "books/list.html",
         books=pagination.items,
-        keyword=keyword,
+        filters={
+            "keyword": keyword,
+            "call_number": call_number,
+            "position": position,
+            "category_id": category_id,
+        },
         pagination=pagination,
         category_options=_category_options(),
     )
