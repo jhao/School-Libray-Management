@@ -56,6 +56,7 @@ NAV_SECTIONS = [
             {"endpoint": "system.list_users", "label": "用户列表"},
             {"endpoint": "system.create_user", "label": "新增用户"},
             {"endpoint": "system.system_settings", "label": "系统外观"},
+            {"endpoint": "system.backup_restore", "label": "备份与恢复"},
         ],
         "prefixes": ["system."],
     },

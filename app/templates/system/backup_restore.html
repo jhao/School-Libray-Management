@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}数据库备份与恢复{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>数据库备份与恢复</h2>
+</div>
+{% if not database_exists %}
+<div class="alert alert-warning">
+  当前数据库不支持备份或数据库文件不存在，请检查系统配置。
+</div>
+{% endif %}
+<div class="row">
+  <div class="col-md-6">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">备份</h3>
+      </div>
+      <div class="panel-body">
+        <p>点击下方按钮即可下载当前数据库的备份文件，文件后缀为 <code>.libk</code>。</p>
+        <form method="post" action="{{ url_for('system.backup_restore') }}">
+          <input type="hidden" name="action" value="backup">
+          <button type="submit" class="btn btn-primary" {% if not database_exists %}disabled{% endif %}>下载备份</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">恢复</h3>
+      </div>
+      <div class="panel-body">
+        <p>选择之前下载的 <code>.libk</code> 文件进行上传，将覆盖当前数据库，请谨慎操作。</p>
+        <form method="post" action="{{ url_for('system.backup_restore') }}" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="restore">
+          <div class="form-group">
+            <input type="file" name="backup_file" accept=".libk" class="form-control" {% if not database_exists %}disabled{% endif %}>
+          </div>
+          <button type="submit" class="btn btn-danger" {% if not database_exists %}disabled{% endif %}>上传恢复</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">操作日志</h3>
+  </div>
+  <div class="panel-body" style="max-height: 260px; overflow-y: auto;">
+    {% if logs %}
+    <ul class="list-unstyled" style="margin-bottom: 0;">
+      {% for log in logs %}
+      <li><code>{{ log }}</code></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">暂无备份或恢复操作记录。</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
