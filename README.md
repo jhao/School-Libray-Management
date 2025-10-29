@@ -73,6 +73,13 @@
      school-library
    ```
 
+   单容器模式下，初始化数据库与基础数据时可通过 `docker exec` 进入容器执行：
+
+   ```bash
+   docker exec -it school-library flask --app wsgi init-db
+   docker exec -it school-library flask --app wsgi seed
+   ```
+
 2. 首次启动后进入容器执行数据库初始化：
 
    ```bash
