@@ -19,8 +19,11 @@
     <div class="col-sm-6">
       <select name="parent_id" class="form-control">
         <option value="">顶级分类</option>
-        {% for item in categories %}
-        <option value="{{ item.id }}">{{ item.name }}</option>
+        {% for item in category_options %}
+        {% set option = item.category %}
+        {% set indent = '&nbsp;&nbsp;&nbsp;&nbsp;' * item.depth %}
+        {% set prefix = '└ ' if item.depth > 0 else '' %}
+        <option value="{{ option.id }}">{{ indent|safe }}{{ prefix }}{{ option.name }}</option>
         {% endfor %}
       </select>
     </div>

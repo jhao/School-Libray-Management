@@ -3,6 +3,7 @@ from flask_login import login_required
 
 from ..extensions import db
 from ..models import Category
+from ..utils.category_tree import build_category_tree, flatten_category_tree
 
 
 bp = Blueprint("categories", __name__, url_prefix="/categories")
@@ -11,22 +12,28 @@ bp = Blueprint("categories", __name__, url_prefix="/categories")
 @bp.route("/")
 @login_required
 def list_categories():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
-    pagination = (
+    categories = (
         Category.query.filter_by(is_deleted=False)
         .order_by(Category.sort, Category.name)
-        .paginate(page=page, per_page=per_page, error_out=False)
+        .all()
     )
-    return render_template("categories/list.html", categories=pagination.items, pagination=pagination)
+    category_tree = build_category_tree(categories)
+    category_rows = list(flatten_category_tree(category_tree))
+    return render_template("categories/list.html", category_rows=category_rows)
 
 
 @bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_category():
-    categories = Category.query.filter_by(is_deleted=False).order_by(Category.name).all()
+    categories = (
+        Category.query.filter_by(is_deleted=False)
+        .order_by(Category.sort, Category.name)
+        .all()
+    )
+    category_tree = build_category_tree(categories)
+    category_options = list(flatten_category_tree(category_tree))
     if request.method == "GET":
-        return render_template("categories/create.html", categories=categories)
+        return render_template("categories/create.html", category_options=category_options)
 
     name = request.form.get("name", "").strip()
     if not name:
