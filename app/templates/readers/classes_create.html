@@ -9,12 +9,6 @@
 </div>
 <form method="post" action="{{ url_for('readers.create_class') }}" class="form-horizontal">
   <div class="form-group">
-    <label class="col-sm-2 control-label">班级名称</label>
-    <div class="col-sm-6">
-      <input type="text" name="name" class="form-control" required>
-    </div>
-  </div>
-  <div class="form-group">
     <label class="col-sm-2 control-label">所属年级</label>
     <div class="col-sm-6">
       <select name="grade_id" class="form-control" required>
@@ -23,6 +17,14 @@
         <option value="{{ grade.id }}">{{ grade.name }}</option>
         {% endfor %}
       </select>
+      <p class="help-block">请选择需要批量创建班级的年级。</p>
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="col-sm-2 control-label">班级名称</label>
+    <div class="col-sm-6">
+      <textarea name="names" class="form-control" rows="8" placeholder="每行一个班级名称" required></textarea>
+      <p class="help-block">支持一次性输入多个班级名称，每行一个，例如：一班\n二班。</p>
     </div>
   </div>
   <div class="form-group">
