@@ -45,7 +45,7 @@
       </div>
     </header>
     <div class="app-body">
-      <aside class="app-sidebar" id="app-sidebar">
+      <aside class="app-sidebar" id="app-sidebar" style="background-color: {{ system_sidebar_color }};">
         {% set endpoint = request.endpoint or '' %}
         {% set sections = system_nav_sections or [] %}
         {% set active_section = (sections | selectattr('key', 'equalto', system_active_nav_key) | list | first) %}
