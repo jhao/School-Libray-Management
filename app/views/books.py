@@ -3,7 +3,13 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import login_required
-from openpyxl import Workbook, load_workbook
+
+try:  # pragma: no cover - import guard is environment dependent
+    from openpyxl import Workbook, load_workbook
+    _HAS_OPENPYXL = True
+except ModuleNotFoundError:  # pragma: no cover - exercised when dependency missing
+    Workbook = load_workbook = None  # type: ignore[assignment]
+    _HAS_OPENPYXL = False
 
 from ..extensions import db
 from ..models import Book, Category
@@ -102,6 +108,10 @@ def delete_book(book_id: int):
 @bp.route("/import", methods=["POST"])
 @login_required
 def import_books():
+    if not _HAS_OPENPYXL:
+        flash("未安装 openpyxl 库，无法导入。请先运行 pip install openpyxl。", "danger")
+        return redirect(url_for("books.list_books"))
+
     file = request.files.get("file")
     if not file:
         flash("请选择Excel文件", "danger")
@@ -142,6 +152,10 @@ def import_books():
 @bp.route("/export")
 @login_required
 def export_books():
+    if not _HAS_OPENPYXL:
+        flash("未安装 openpyxl 库，无法导出。请先运行 pip install openpyxl。", "danger")
+        return redirect(url_for("books.list_books"))
+
     wb = Workbook()
     ws = wb.active
     ws.append([

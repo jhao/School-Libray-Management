@@ -30,6 +30,8 @@
    pip install -r requirements.txt
    ```
 
+   **提示**：若仅需运行数据库初始化等命令而暂不使用 Excel 导入/导出功能，可先跳过安装 `openpyxl`。当系统检测到缺少该依赖时，会在页面上给予提示并引导执行 `pip install openpyxl`。
+
 2. （可选）如需使用 MySQL，请设置数据库连接并初始化：
 
    ```bash
