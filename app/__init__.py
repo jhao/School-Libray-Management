@@ -1,10 +1,73 @@
 import os
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, request
 
 from .extensions import db, migrate, login_manager
 from .models import SystemSetting, User
+
+
+NAV_SECTIONS = [
+    {
+        "key": "common",
+        "title": "常用功能",
+        "items": [
+            {"endpoint": "stats.dashboard", "label": "统计分析"},
+            {"endpoint": "lending.borrow", "label": "借书"},
+            {"endpoint": "lending.return_book", "label": "还书"},
+        ],
+        "prefixes": ["stats.", "lending."],
+    },
+    {
+        "key": "books",
+        "title": "图书管理",
+        "items": [
+            {"endpoint": "books.list_books", "label": "图书列表"},
+            {"endpoint": "books.create_book", "label": "新增图书"},
+            {"endpoint": "categories.list_categories", "label": "分类列表"},
+            {"endpoint": "categories.create_category", "label": "新增分类"},
+        ],
+        "prefixes": ["books.", "categories."],
+    },
+    {
+        "key": "readers",
+        "title": "读者管理",
+        "items": [
+            {"endpoint": "readers.list_readers", "label": "读者列表"},
+            {"endpoint": "readers.create_reader", "label": "新增读者"},
+            {"endpoint": "readers.manage_grades", "label": "年级列表"},
+            {"endpoint": "readers.create_grade", "label": "新增年级"},
+            {"endpoint": "readers.manage_classes", "label": "班级列表"},
+            {"endpoint": "readers.create_class", "label": "新增班级"},
+        ],
+        "prefixes": ["readers."],
+    },
+    {
+        "key": "system",
+        "title": "系统设置",
+        "items": [
+            {"endpoint": "system.list_users", "label": "用户列表"},
+            {"endpoint": "system.create_user", "label": "新增用户"},
+            {"endpoint": "system.system_settings", "label": "系统外观"},
+        ],
+        "prefixes": ["system."],
+    },
+]
+
+
+def _resolve_active_section(endpoint: str) -> str:
+    if not NAV_SECTIONS:
+        return ""
+    if not endpoint:
+        return NAV_SECTIONS[0]["key"]
+    for section in NAV_SECTIONS:
+        if any(item["endpoint"] == endpoint for item in section["items"]):
+            return section["key"]
+    for section in NAV_SECTIONS:
+        for prefix in section.get("prefixes", []):
+            if endpoint.startswith(prefix):
+                return section["key"]
+    return NAV_SECTIONS[0]["key"]
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -43,9 +106,20 @@ def create_app(test_config=None):
     def inject_system_settings():
         logo_path = SystemSetting.get_value("system_logo") or ""
         topbar_color = SystemSetting.get_value("topbar_color") or "#1f2d3d"
+        current_endpoint = request.endpoint or ""
+        nav_sections = [
+            {
+                "key": section["key"],
+                "title": section["title"],
+                "items": section["items"],
+            }
+            for section in NAV_SECTIONS
+        ]
         return {
             "system_logo_path": logo_path,
             "system_topbar_color": topbar_color,
+            "system_nav_sections": nav_sections,
+            "system_active_nav_key": _resolve_active_section(current_endpoint),
         }
 
     return app

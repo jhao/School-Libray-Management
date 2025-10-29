@@ -50,6 +50,16 @@ from ..utils.category_tree import build_category_tree, flatten_category_tree
 bp = Blueprint("books", __name__, url_prefix="/books")
 
 
+def _category_options():
+    categories = (
+        Category.query.filter_by(is_deleted=False)
+        .order_by(Category.sort, Category.name)
+        .all()
+    )
+    category_tree = build_category_tree(categories)
+    return list(flatten_category_tree(category_tree))
+
+
 @bp.route("/")
 @login_required
 def list_books():
@@ -66,6 +76,7 @@ def list_books():
         books=pagination.items,
         keyword=keyword,
         pagination=pagination,
+        category_options=_category_options(),
     )
 
 
@@ -73,16 +84,15 @@ def list_books():
 @login_required
 def create_book():
     if request.method == "GET":
-        categories = (
-            Category.query.filter_by(is_deleted=False)
-            .order_by(Category.sort, Category.name)
-            .all()
-        )
-        category_tree = build_category_tree(categories)
-        category_options = list(flatten_category_tree(category_tree))
+        category_options = _category_options()
         return render_template("books/create.html", category_options=category_options)
 
     form = request.form
+    name = form.get("name", "").strip()
+    if not name:
+        flash("图书名称不能为空", "danger")
+        return redirect(url_for("books.create_book"))
+
     isbn = form.get("isbn", "").strip()
     if not isbn:
         flash("ISBN不能为空", "danger")
@@ -91,12 +101,26 @@ def create_book():
         flash("该ISBN已存在", "danger")
         return redirect(url_for("books.create_book"))
 
+    amount_raw = (form.get("amount") or "").strip()
+    if not amount_raw:
+        flash("数量不能为空", "danger")
+        return redirect(url_for("books.create_book"))
+    try:
+        amount = int(amount_raw)
+    except ValueError:
+        flash("数量必须为数字", "danger")
+        return redirect(url_for("books.create_book"))
+    if amount <= 0:
+        flash("数量必须大于0", "danger")
+        return redirect(url_for("books.create_book"))
+
     book = Book(
-        name=form.get("name", "未命名图书"),
+        name=name,
         isbn=isbn,
+        call_number=form.get("call_number") or None,
         position=form.get("position"),
         category_id=int(form.get("category_id")) if form.get("category_id") else None,
-        amount=int(form.get("amount", 1) or 1),
+        amount=amount,
         lend_amount=int(form.get("lend_amount", 0) or 0),
         price=form.get("price") or 0,
         publisher=form.get("publisher"),
@@ -121,11 +145,36 @@ def create_book():
 def update_book(book_id: int):
     book = Book.query.get_or_404(book_id)
     form = request.form
-    book.name = form.get("name", book.name)
-    book.isbn = form.get("isbn", book.isbn)
+    name = form.get("name", "").strip()
+    isbn = form.get("isbn", "").strip()
+    amount_raw = (form.get("amount") or "").strip()
+
+    if not name:
+        flash("图书名称不能为空", "danger")
+        return redirect(url_for("books.list_books"))
+    if not isbn:
+        flash("ISBN不能为空", "danger")
+        return redirect(url_for("books.list_books"))
+    if not amount_raw:
+        flash("数量不能为空", "danger")
+        return redirect(url_for("books.list_books"))
+
+    try:
+        amount = int(amount_raw)
+    except ValueError:
+        flash("数量必须为数字", "danger")
+        return redirect(url_for("books.list_books"))
+
+    if amount <= 0:
+        flash("数量必须大于0", "danger")
+        return redirect(url_for("books.list_books"))
+
+    book.name = name
+    book.isbn = isbn
+    book.call_number = form.get("call_number") or None
     book.position = form.get("position")
     book.category_id = int(form.get("category_id")) if form.get("category_id") else None
-    book.amount = int(form.get("amount", book.amount) or book.amount)
+    book.amount = amount
     book.lend_amount = int(form.get("lend_amount", book.lend_amount) or book.lend_amount)
     book.price = form.get("price") or book.price
     book.publisher = form.get("publisher")

@@ -19,40 +19,56 @@
           <span>学校图书馆管理</span>
         </a>
       </div>
+      <nav class="topbar-nav hidden-xs">
+        {% set sections = system_nav_sections or [] %}
+        {% for section in sections %}
+        {% set default_item = (section['items'] | first) %}
+        <a
+          class="topbar-nav-link {% if section['key'] == system_active_nav_key %}active{% endif %}"
+          href="{{ url_for(default_item['endpoint']) if default_item else '#' }}"
+        >
+          {{ section['title'] }}
+        </a>
+        {% endfor %}
+      </nav>
       <div class="topbar-actions">
         <button class="btn btn-default btn-xs visible-xs-inline-block" id="mobile-menu-toggle" type="button" aria-label="展开菜单">
           <span class="glyphicon glyphicon-menu-hamburger"></span>
         </button>
-        <a class="btn btn-link btn-logout" href="{{ url_for('auth.logout') }}">退出</a>
+        {% if current_user.is_authenticated %}
+        <div class="topbar-user">
+          <a class="topbar-username" href="{{ url_for('auth.change_password') }}">{{ current_user.username }}</a>
+          <span class="topbar-divider">|</span>
+          <a class="btn btn-link btn-logout" href="{{ url_for('auth.logout') }}">退出</a>
+        </div>
+        {% endif %}
       </div>
     </header>
     <div class="app-body">
       <aside class="app-sidebar" id="app-sidebar">
         {% set endpoint = request.endpoint or '' %}
+        {% set sections = system_nav_sections or [] %}
+        {% set active_section = (sections | selectattr('key', 'equalto', system_active_nav_key) | list | first) %}
+        {% if not active_section and sections %}
+          {% set active_section = sections|first %}
+        {% endif %}
         <nav class="sidebar-nav">
-          <p class="sidebar-title">常用功能</p>
-          <a class="sidebar-link {% if endpoint == 'stats.dashboard' %}active{% endif %}" href="{{ url_for('stats.dashboard') }}">统计分析</a>
-          <a class="sidebar-link {% if endpoint == 'lending.borrow' %}active{% endif %}" href="{{ url_for('lending.borrow') }}">借书</a>
-          <a class="sidebar-link {% if endpoint == 'lending.return_book' %}active{% endif %}" href="{{ url_for('lending.return_book') }}">还书</a>
-
-          <p class="sidebar-title">图书管理</p>
-          <a class="sidebar-link {% if endpoint == 'books.list_books' %}active{% endif %}" href="{{ url_for('books.list_books') }}">图书列表</a>
-          <a class="sidebar-link {% if endpoint == 'books.create_book' %}active{% endif %}" href="{{ url_for('books.create_book') }}">新增图书</a>
-          <a class="sidebar-link {% if endpoint == 'categories.list_categories' %}active{% endif %}" href="{{ url_for('categories.list_categories') }}">分类列表</a>
-          <a class="sidebar-link {% if endpoint == 'categories.create_category' %}active{% endif %}" href="{{ url_for('categories.create_category') }}">新增分类</a>
-
-          <p class="sidebar-title">读者管理</p>
-          <a class="sidebar-link {% if endpoint == 'readers.list_readers' %}active{% endif %}" href="{{ url_for('readers.list_readers') }}">读者列表</a>
-          <a class="sidebar-link {% if endpoint == 'readers.create_reader' %}active{% endif %}" href="{{ url_for('readers.create_reader') }}">新增读者</a>
-          <a class="sidebar-link {% if endpoint == 'readers.manage_grades' %}active{% endif %}" href="{{ url_for('readers.manage_grades') }}">年级列表</a>
-          <a class="sidebar-link {% if endpoint == 'readers.create_grade' %}active{% endif %}" href="{{ url_for('readers.create_grade') }}">新增年级</a>
-          <a class="sidebar-link {% if endpoint == 'readers.manage_classes' %}active{% endif %}" href="{{ url_for('readers.manage_classes') }}">班级列表</a>
-          <a class="sidebar-link {% if endpoint == 'readers.create_class' %}active{% endif %}" href="{{ url_for('readers.create_class') }}">新增班级</a>
-
-          <p class="sidebar-title">系统设置</p>
-          <a class="sidebar-link {% if endpoint == 'system.list_users' %}active{% endif %}" href="{{ url_for('system.list_users') }}">用户列表</a>
-          <a class="sidebar-link {% if endpoint == 'system.create_user' %}active{% endif %}" href="{{ url_for('system.create_user') }}">新增用户</a>
-          <a class="sidebar-link {% if endpoint == 'system.system_settings' %}active{% endif %}" href="{{ url_for('system.system_settings') }}">系统外观</a>
+          <div class="hidden-xs">
+            {% if active_section %}
+              <p class="sidebar-title">{{ active_section['title'] }}</p>
+              {% for item in active_section['items'] %}
+              <a class="sidebar-link {% if endpoint == item['endpoint'] %}active{% endif %}" href="{{ url_for(item['endpoint']) }}">{{ item['label'] }}</a>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div class="visible-xs-block sidebar-mobile-nav">
+            {% for section in sections %}
+              <p class="sidebar-title">{{ section['title'] }}</p>
+              {% for item in section['items'] %}
+              <a class="sidebar-link {% if endpoint == item['endpoint'] %}active{% endif %}" href="{{ url_for(item['endpoint']) }}">{{ item['label'] }}</a>
+              {% endfor %}
+            {% endfor %}
+          </div>
         </nav>
       </aside>
       <main class="app-content">
