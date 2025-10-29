@@ -297,6 +297,28 @@ def import_books():
         restored_count = 0
         skipped: List[str] = []
 
+        categories = (
+            Category.query.filter_by(is_deleted=False)
+            .order_by(Category.sort, Category.name)
+            .all()
+        )
+        category_tree = build_category_tree(categories)
+        flattened_categories = list(flatten_category_tree(category_tree))
+        category_display_map = {}
+        category_by_name = {}
+        category_by_id = {str(category.id): category for category in categories}
+        for item in flattened_categories:
+            category = item["category"]
+            depth = item["depth"]
+            prefix = "└ " if depth > 0 else ""
+            indent = "  " * depth
+            display = f"{indent}{prefix}{category.name}"
+            keys = {display, display.strip(), category.name}
+            for key in keys:
+                if key:
+                    category_display_map.setdefault(key, category)
+            category_by_name.setdefault(category.name, []).append(category)
+
         for index, row in enumerate(rows, start=2):
             if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
@@ -312,8 +334,10 @@ def import_books():
                 skipped.append(f"第{index}行(ISBN {isbn}): 已存在未删除的图书")
                 continue
 
-            position = row[2] if len(row) > 2 else None
-            raw_amount = row[3] if len(row) > 3 else None
+            category_raw = str(row[2]) if len(row) > 2 and row[2] is not None else ""
+            category_value = category_raw.strip() if category_raw else ""
+            position = row[3] if len(row) > 3 else None
+            raw_amount = row[4] if len(row) > 4 else None
             try:
                 if raw_amount in (None, ""):
                     amount = 1
@@ -326,10 +350,29 @@ def import_books():
                 skipped.append(f"第{index}行(ISBN {isbn}): 数量必须大于0")
                 continue
 
-            price = row[4] if len(row) > 4 else 0
-            publisher = row[5] if len(row) > 5 else None
-            author = row[6] if len(row) > 6 else None
-            summary = row[7] if len(row) > 7 else None
+            price = row[5] if len(row) > 5 else 0
+            publisher = row[6] if len(row) > 6 else None
+            author = row[7] if len(row) > 7 else None
+            summary = row[8] if len(row) > 8 else None
+
+            category_obj = None
+            if category_raw:
+                category_obj = category_display_map.get(category_raw) or category_display_map.get(
+                    category_value
+                )
+            if category_obj is None and category_value:
+                category_obj = category_by_id.get(category_value)
+                if category_obj is None:
+                    try:
+                        category_numeric = int(float(category_value))
+                    except (TypeError, ValueError):
+                        category_numeric = None
+                    if category_numeric is not None:
+                        category_obj = category_by_id.get(str(category_numeric))
+                if category_obj is None:
+                    matches = category_by_name.get(category_value)
+                    if matches:
+                        category_obj = matches[0]
 
             existing_deleted = Book.query.filter_by(isbn=isbn, is_deleted=True).first()
             if existing_deleted:
@@ -342,6 +385,7 @@ def import_books():
                 existing_deleted.author = author
                 existing_deleted.summary = summary
                 existing_deleted.updated_by_id = current_user.id
+                existing_deleted.category_id = category_obj.id if category_obj else None
                 existing_deleted.is_deleted = False
                 restored_count += 1
                 continue
@@ -355,6 +399,7 @@ def import_books():
                 publisher=publisher,
                 author=author,
                 summary=summary,
+                category_id=category_obj.id if category_obj else None,
             )
             book.updated_by_id = current_user.id
             db.session.add(book)
@@ -392,7 +437,65 @@ def download_import_template():
 
     wb = workbook_cls()
     ws = wb.active
-    ws.append(["图书名称", "ISBN", "位置", "数量", "价格", "出版社", "作者", "简介"])
+    ws.title = "图书信息"
+    ws.append(["图书名称", "ISBN", "分类", "位置", "数量", "价格", "出版社", "作者", "简介"])
+
+    categories = (
+        Category.query.filter_by(is_deleted=False)
+        .order_by(Category.sort, Category.name)
+        .all()
+    )
+    category_tree = build_category_tree(categories)
+    flattened_categories = list(flatten_category_tree(category_tree))
+
+    data_sheet = wb.create_sheet("分类信息")
+    data_sheet.append(["分类", "分类ID", "层级", "原始名称"])
+    for idx, item in enumerate(flattened_categories, start=2):
+        category = item["category"]
+        depth = item["depth"]
+        prefix = "└ " if depth > 0 else ""
+        indent = "  " * depth
+        display_name = f"{indent}{prefix}{category.name}"
+        data_sheet.cell(row=idx, column=1, value=display_name)
+        data_sheet.cell(row=idx, column=2, value=category.id)
+        data_sheet.cell(row=idx, column=3, value=depth)
+        data_sheet.cell(row=idx, column=4, value=category.name)
+    data_sheet.sheet_state = "hidden"
+
+    try:
+        dv_module = import_module("openpyxl.worksheet.datavalidation")
+        DataValidation = getattr(dv_module, "DataValidation", None)
+        utils_module = import_module("openpyxl.utils")
+        get_column_letter = getattr(utils_module, "get_column_letter", None)
+        quote_sheetname_fn = getattr(utils_module, "quote_sheetname", None)
+    except Exception:  # noqa: BLE001 - fallback when openpyxl structure changes
+        DataValidation = None
+        get_column_letter = None
+        quote_sheetname_fn = None
+
+    def _quote_sheet_name(name: str) -> str:
+        if quote_sheetname_fn:
+            return quote_sheetname_fn(name)
+        escaped = name.replace("'", "''")
+        return f"'{escaped}'"
+
+    if DataValidation and get_column_letter:
+        max_rows = 500
+        category_column = get_column_letter(3)
+        if flattened_categories:
+            category_list_ref = (
+                f"={_quote_sheet_name(data_sheet.title)}!$A$2:$A${len(flattened_categories) + 1}"
+            )
+            category_range = f"{category_column}2:{category_column}{max_rows}"
+            category_validation = DataValidation(
+                type="list",
+                formula1=category_list_ref,
+                allow_blank=True,
+            )
+            category_validation.error = "请选择下拉列表中的分类"
+            category_validation.errorTitle = "无效的分类"
+            ws.add_data_validation(category_validation)
+            category_validation.add(category_range)
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
