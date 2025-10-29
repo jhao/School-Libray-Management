@@ -3,8 +3,14 @@
 {% block content %}
 <div class="page-header">
   <h2>图书列表</h2>
-  <div class="header-actions">
-    <a class="btn btn-primary" href="{{ url_for('books.create_book') }}">新增图书</a>
+</div>
+<div class="action-toolbar">
+  <div class="action-group">
+    <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importBooksModal">导入Excel</button>
+    <a class="btn btn-sm btn-success" href="{{ url_for('books.export_books') }}">导出Excel</a>
+  </div>
+  <div class="action-group action-group-right">
+    <a class="btn btn-sm btn-primary" href="{{ url_for('books.create_book') }}">新增图书</a>
   </div>
 </div>
 <div class="panel panel-default">
@@ -33,16 +39,6 @@
       <button class="btn btn-sm btn-primary" type="submit">搜索</button>
       <a class="btn btn-sm btn-default" href="{{ url_for('books.list_books') }}">重置</a>
     </form>
-  </div>
-  <div class="panel-body">
-    <div class="row">
-      <div class="col-sm-6">
-        <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#importBooksModal">导入Excel</button>
-      </div>
-      <div class="col-sm-6 text-right">
-        <a class="btn btn-sm btn-success" href="{{ url_for('books.export_books') }}">导出Excel</a>
-      </div>
-    </div>
   </div>
   <table class="table table-striped table-condensed table-hover">
     <thead>
