@@ -29,6 +29,7 @@
           <th>读者</th>
           <th>图书</th>
           <th>数量</th>
+          <th>归还操作人</th>
         </tr>
       </thead>
       <tbody>
@@ -38,6 +39,7 @@
           <td>{{ record.lend.reader.name }} ({{ record.lend.reader.card_no }})</td>
           <td>{{ record.lend.book.name }} ({{ record.lend.book.isbn }})</td>
           <td>{{ record.amount }}</td>
+          <td>{{ record.operator.username if record.operator else '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
