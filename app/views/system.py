@@ -488,6 +488,28 @@ def delete_test_data_batch(batch_id: int):
     return redirect(url_for("system.test_data"))
 
 
+@bp.route("/test-data/batches/delete-all", methods=["POST"])
+@login_required
+def delete_all_test_data_batches():
+    if not admin_required():
+        return redirect(url_for("system.test_data"))
+
+    super_admin = _ensure_super_admin()
+    deleted_records = _delete_super_admin_data(super_admin)
+    deleted_batches = TestDataBatch.query.delete(synchronize_session=False)
+    db.session.commit()
+
+    if deleted_records or deleted_batches:
+        flash(
+            f"已删除 {deleted_records} 条测试数据，清空 {deleted_batches} 条生成记录",
+            "success",
+        )
+    else:
+        flash("没有可删除的测试数据。", "info")
+
+    return redirect(url_for("system.test_data"))
+
+
 @bp.route("/backup", methods=["GET", "POST"])
 @login_required
 def backup_restore():
