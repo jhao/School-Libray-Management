@@ -84,6 +84,8 @@ class Book(SoftDeleteMixin, TimestampMixin, db.Model):
     summary = db.Column(db.String(500))
     input_num = db.Column(db.Integer)
     remark = db.Column(db.String(2000))
+    updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    updated_by = db.relationship("User", foreign_keys=[updated_by_id])
 
     def available_amount(self) -> int:
         return max(self.amount - self.lend_amount, 0)
