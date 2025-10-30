@@ -17,7 +17,7 @@
       return;
     }
     var sidebar = document.getElementById('app-sidebar');
-    if (!sidebar.contains(event.target) && event.target !== toggleButton) {
+    if (!sidebar.contains(event.target) && !toggleButton.contains(event.target)) {
       document.body.classList.remove('sidebar-open');
     }
   });
